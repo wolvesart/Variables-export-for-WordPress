@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root,body{--color-blue: #c7f6fd;--color-orange: #f2bc9c;--color-yellow: #eaf99b;--color-purple-500: #c2b7ef;--color-dark-0: #ffffff;--color-dark-900: #0f0f0f;--color-dark-600: #28282c;--color-green-800: #042c2f;--color-purple-600: #b7a2f1;--color-green-500: #1d5459;--color-green-100: #a6eddd;--color-green-200: #69bcb1;--spacing-size-h1: 1.75rem;--spacing-size-h2: 1.25rem;--spacing-size-h3: 2.5rem;--spacing-size-lg: 1.38rem;--spacing-size-md: 1.25rem;--spacing-size-sm: 1.12rem;--spacing-size-xs: 1rem;--spacing-40: 2.5rem;--spacing-24: 1.5rem;--spacing-16: 1rem;--spacing-12: 0.75rem;--spacing-32: 2rem;--spacing-8: 0.5rem;--spacing-4: 0.25rem;--radius-border-radius-full: 62.5rem;--radius-border-radius-12: 0.75rem;--font-title-h1: 400 1.1rem Cascadia Code;--font-title-h2: 400 0.8rem Cascadia Code;--font-body-large: 400 1rem Cascadia Code;--font-body-medium: 400 0.85rem Cascadia Code;--font-body-medium-500: 400 0.85rem Cascadia Code;--font-body-small: 400 0.7rem Cascadia Code;--font-body-small-500: 400 0.7rem Cascadia Code;--color-text-primary: var(--color-green-100);--color-text-secondary: var(--color-green-200);--color-text-invert: var(--color-green-800);--color-components-btn-primary: var(--color-purple-500);--color-components-btn-primaryhover: var(--color-purple-600);--color-components-btn-secondary: var(--color-green-500);--color-border-primary: var(--color-green-500);--color-components-btn-secondaryhover: var(--color-green-500);--color-surface-primary: var(--color-green-500);--color-surface-bg: var(--color-green-800);--color-icon-primary: var(--color-green-800);--color-components-btn-disabled: var(--color-null);--color-components-btn-primary-content: var(--color-green-800);--color-components-btn-secondary-content: var(--color-text-primary);--spacing-card-sm: var(--spacing-24);--radius-border-radius-card: var(--radius-border-radius-8)}*{margin:0;padding:0;box-sizing:border-box}body{padding:16px;background:var(--color-surface-bg);color:var(--color-text-primary);font-family:"Cascadia Code",Consolas,Monaco,"Courier New",monospace;font-size:.85rem;line-height:1.4}.container{max-width:400px}h1,h2,h3{font-weight:600;margin-bottom:16px;color:var(--color-text-primary)}h1{font:var(--font-title-h1)}h2{font:var(--font-title-h2)}p{font:var(--font-body-medium);color:var(--color-text-secondary)}section{margin:28px 0}.section-title{text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:16px}label{display:block;font-size:11px;font-weight:500;margin-bottom:8px;color:#999;text-transform:uppercase;letter-spacing:.5px}code{background:#2a2a2c;padding:2px 6px;border-radius:3px;font-family:"Cascadia Code",Consolas,Monaco,"Courier New",monospace;font-size:10px;color:#fff}.info{background:#1a1a1c;padding:12px;border-radius:4px;font-size:11px;color:#999;margin-bottom:16px;line-height:1.5}.head{margin-bottom:8px}.head h1{font-size:16px;font-weight:600;margin-bottom:4px;color:#fff}.head p{font-size:11px;color:#999;line-height:1.4}@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}input[type=text]{width:100%;padding:8px 12px;border:1px solid #333;border-radius:4px;font-size:12px;font-family:"Monaco",monospace;background:#1a1a1c;color:#fff}input[type=text]:focus{outline:none;border-color:#18a0fb}.checkbox-group{display:flex;align-items:center;gap:8px;margin-top:12px}input[type=checkbox]{width:16px;height:16px;cursor:pointer}.checkbox-group label{margin:0;font-size:12px;text-transform:none;cursor:pointer;font-weight:400;color:#fff}.export-option{display:flex;align-items:center;gap:var(--spacing-16);padding:var(--spacing-16) 0;border-top:1px solid var(--color-green-500);border-bottom:1px solid var(--color-green-500);cursor:pointer;user-select:none;transition:opacity .2s;text-transform:none}.export-option:hover{opacity:.9}.export-option-label{flex:1;font:var(--font-body-medium);color:var(--color-text-primary);margin:0;cursor:pointer}.custom-checkbox{position:relative;display:inline-block;margin:0}.custom-checkbox input[type=checkbox]{position:absolute;opacity:0;width:0;height:0}.custom-checkbox .checkbox-box{display:block;width:22px;height:22px;border:1px solid var(--color-green-200);background:rgba(0,0,0,0);position:relative;transition:all .2s}.custom-checkbox input[type=checkbox]:checked+.checkbox-box::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%, -50%);width:16px;height:16px;background:var(--color-green-200)}.custom-checkbox input[type=checkbox]:focus-visible+.checkbox-box{outline:2px solid var(--color-green-100);outline-offset:2px}.button-group{display:flex;gap:8px;margin-top:20px}button{flex:1;padding:10px 16px;border:none;font:var(--font-body-medium-500);cursor:pointer;transition:all .2s;position:relative;box-shadow:inset 0 2px 0 0 rgba(0,0,0,0),inset 0 -2px 0 0 rgba(0,0,0,0)}button::before,button::after{content:"";position:absolute;height:2px;width:calc(100% - 4px);left:50%;transform:translateX(-50%)}button::before{top:-2px}button::after{bottom:-2px}.primary{background:var(--color-purple-500);color:var(--color-text-invert)}.primary::before,.primary::after{background:var(--color-purple-500)}.primary:hover{background:var(--color-purple-600)}.primary:hover::before,.primary:hover::after{background:var(--color-purple-600)}#generate,#generateTheme{display:flex;align-items:center;justify-content:center;gap:4px}#generate span.icon,#generateTheme span.icon{display:inline-block;width:16px;height:16px;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M11.9167 15.5833V2.75H10.0833V11.9167H8.25V10.0833H6.41667V11.9167H8.25V13.75H10.0833V15.5833H11.9167ZM19.25 17.4167V13.75H17.4167V17.4167H4.58333V13.75H2.75V19.25H19.25V17.4167ZM11.9167 11.9167V13.75H13.75V11.9167H15.5833V10.0833H13.75V11.9167H11.9167Z' fill='currentcolor'/%3E%3C/svg%3E");mask-repeat:no-repeat;mask-size:contain;mask-position:center;background:currentColor}.secondary{background:var(--color-green-500);color:var(--color-text-primary)}.secondary::before,.secondary::after{background:var(--color-green-500)}.secondary:hover{background:#194b50}.secondary:hover::before,.secondary:hover::after{background:#194b50}.success{background:#0fa958;color:#fff;padding:12px;border-radius:4px;font-size:12px;margin-top:16px;display:none}.success.show{display:block;animation:slideIn .3s ease}.dashboard{padding:16px;display:flex;align-items:center;gap:32px;border:1px solid var(--color-green-500);position:relative;background-color:var(--color-green-800)}.dashboard:after{content:"";border:1px solid var(--color-green-500);position:absolute;width:100%;height:100%;top:4px;left:4px;z-index:-1}.dashboard .chart-wrapper{position:relative;width:85px;height:85px}.dashboard .chart-wrapper .chart-canvas{width:85px;height:85px}.dashboard .chart-wrapper .chart-percent{position:absolute;top:50%;left:50%;transform:translate(-50%, -50%);text-align:center;font-size:1rem;font-weight:700;color:var(--color-text-primary);line-height:1}.dashboard .chart-info{flex:1;display:flex;flex-direction:column;gap:12px}.dashboard .chart-info .details{display:flex;flex-direction:column;gap:4px}.dashboard .chart-info .details .title{text-transform:uppercase;font:var(--font-body-small);color:var(--color-text-secondary)}.dashboard .chart-info .details .result{color:var(--color-text-primary);font:var(--font-body-medium-500)}.dashboard .chart-info .details .chart-stats{display:flex;gap:12px}.dashboard .chart-info .details .chart-stats .chart-stat{display:flex;align-items:center;gap:4px}.dashboard .chart-info .details .chart-stats .chart-stat .dot{width:8px;height:8px;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M8 2H10V8H8V10H2V8H0V2H2V0H8V2Z' fill='currentcolor'/%3E%3C/svg%3E");mask-repeat:no-repeat;mask-size:contain;mask-position:center}.dashboard .chart-info .details .chart-stats .chart-stat .dot.used{background:var(--color-purple-500)}.dashboard .chart-info .details .chart-stats .chart-stat .dot.unused{background:var(--color-green-500)}.collections-grid{display:flex;flex-wrap:wrap;gap:16px}.collections-grid .collection-item{padding:12px 24px;font:var(--font-body-medium-500);cursor:pointer;transition:all .2s;color:var(--color-text-invert);user-select:none;position:relative}.collections-grid .collection-item:before,.collections-grid .collection-item:after{content:"";position:absolute;height:2px;background:var(--item-color, #000000);width:calc(100% - 4px);left:50%;transform:translateX(-50%)}.collections-grid .collection-item:before{top:-2px}.collections-grid .collection-item:after{bottom:-2px}.collections-grid .collection-item:hover{opacity:.8}.collections-grid .collection-item.inactive{background:var(--color-green-500) !important;color:var(--color-text-primary)}.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid #333;padding-bottom:8px}.tab-btn{background:rgba(0,0,0,0);border:none;color:#999;font-size:11px;font-weight:500;padding:8px 12px;cursor:pointer;border-radius:4px;transition:all .2s;flex:none}.tab-btn:hover{background:#1a1a1c;color:#fff}.tab-btn.active{background:#18a0fb;color:#fff}.tab-content{display:none}.tab-content.active{display:block}.mapping-container{display:flex;flex-direction:column;gap:8px}.mapping-row{display:flex;align-items:center;gap:8px;padding:8px;background:#1a1a1c;border-radius:6px}.mapping-label{flex:1;font-size:11px;font-weight:500;color:#fff}.mapping-label small{display:block;font-size:9px;color:#666;font-weight:400;margin-top:2px}.mapping-select{flex:1;padding:6px 8px;border:1px solid #333;border-radius:4px;font-size:11px;background:#0f0f11;color:#fff;cursor:pointer}.mapping-select:focus{outline:none;border-color:#18a0fb}.mapping-section-title{font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px}.mapping-section-title:first-child{margin-top:0}.mapping-arrow{color:#666;font-size:10px}.info-tab{text-align:center;padding:20px 0}.info-logo{width:64px;height:64px;background:#18a0fb;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px}.info-name{font-size:16px;font-weight:600;margin-bottom:4px}.info-version{font-size:11px;color:#999;margin-bottom:20px}.info-description{font-size:12px;color:#999;line-height:1.5;margin-bottom:20px}.info-link{display:inline-block;color:#18a0fb;font-size:12px;text-decoration:none}.info-link:hover{text-decoration:underline}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <!-- Tabs Navigation -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="scss">Root + Variables</button>
+        <button class="tab-btn" data-tab="theme-json">theme.json</button>
+        <button class="tab-btn" data-tab="info">Info</button>
+    </div>
+
+    <!-- Tab 1: Root + Variables -->
+    <div class="tab-content active" id="tab-scss">
+        <section>
+            <div>
+                <h1>Exporter pour un child theme</h1>
+                <p>La fonction Variables.scss génère deux fichiers SCSS : _variables.scss et _root.scss. Le premier servira les map-get et le second les custom properties.</p>
+            </div>
+        </section>
+        <section>
+            <div class="dashboard" id="dashboard">
+                <div class="chart-wrapper">
+                    <svg id="pieChart" class="chart-canvas" viewBox="0 0 60 60"></svg>
+                    <div class="chart-percent" id="chart-percent">-</div>
+                </div>
+                <div class="chart-info">
+                    <div class="details">
+                        <span class="title">Total variables</span>
+                        <p class="result"><span id="stat-total">0</span> Variables</p>
+                    </div>
+                    <div class="details">
+                        <span class="title">Used/unused variables</span>
+                        <div class="chart-stats">
+                            <div class="chart-stat">
+                                <span class="dot used"></span>
+                                <p class="result"><span id="stat-exported">-</span> used</p>
+                            </div>
+                            <div class="chart-stat">
+                                <span class="dot unused"></span>
+                                <p class="result"><span id="stat-skipped">-</span> unused</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chart-hint"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="collections-section" style="display: none;">
+            <div class="section-title">Choisissez les collections à exporter</div>
+            <div class="collections-grid" id="collections-grid"></div>
+        </section>
+
+        <section>
+            <div class="section-title">Options d'export</div>
+            <label class="export-option" for="onlyUsed">
+                <p class="export-option-label">Exporter uniquement les variables utilisées</p>
+                <span class="custom-checkbox">
+                    <input type="checkbox" id="onlyUsed" checked>
+                    <span class="checkbox-box"></span>
+                </span>
+            </label>
+        </section>
+
+        <footer>
+            <div class="button-group">
+                <button class="secondary" id="cancel">Annuler</button>
+                <button class="primary" id="generate"><span class="icon"></span>Télécharger</button>
+            </div>
+            <div class="success" id="success">
+                ✅ Fichier généré avec succès ! Placez-le dans <code>assets/scss/</code>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Tab 2: theme.json -->
+    <div class="tab-content" id="tab-theme-json">
+        <section>
+            <div class="head">
+                <p>Associez vos collections Figma aux options theme.json de WordPress</p>
+            </div>
+        </section>
+
+        <section class="mapping-container" id="mapping-container">
+            <div class="mapping-section-title">Colors</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    color.palette
+                    <small>Palette de couleurs</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-colors">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Typography</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    typography.fontFamilies
+                    <small>Familles de polices</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-fontFamilies">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    typography.fontSizes
+                    <small>Tailles de texte</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-fontSizes">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Spacing</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    spacing.spacingSizes
+                    <small>Valeurs d'espacement</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-spacing">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Layout</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    custom.radius
+                    <small>Border radius</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-radius">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+        </section>
+
+        <section>
+            <div class="section">
+                <label>Options d'export</label>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="onlyUsedTheme" checked>
+                    <label for="onlyUsedTheme">Exporter uniquement les variables utilisées</label>
+                </div>
+            </div>
+        </section>
+
+        <div class="button-group">
+            <button class="secondary" id="cancelTheme">Annuler</button>
+            <button class="primary" id="generateTheme"><span class="icon"></span>Générer theme.json</button>
+        </div>
+
+        <div class="success" id="success-theme">
+            ✅ theme.json généré avec succès !
+        </div>
+    </div>
+
+    <!-- Tab 3: Info -->
+    <div class="tab-content" id="tab-info">
+        <div class="info-tab">
+            <div class="info-logo">📦</div>
+            <div class="info-name">Variables export for WordPress</div>
+            <div class="info-version">Version 1.0.0</div>
+            <div class="info-description">
+                Export Figma variables to SCSS maps, CSS custom properties, and WordPress theme.json format.
+            </div>
+            <a href="https://github.com/your-repo/issues" target="_blank" class="info-link">🐛 Report a bug</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = () => {
+        // Remove active class from all tabs and contents
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        // Add active class to clicked tab and corresponding content
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    };
+});
+
+// Collection colors palette
+const collectionColors = ['#DDCAF9', '#EAF99B', '#F2BC9C', '#C7F6FD', '#D0FDD5', '#E8E8E8'];
+const inactiveColor = '#39393B';
+
+// Store collections state
+let collectionsData = [];
+let activeCollections = new Set();
+
+// Render collections grid
+function renderCollections(collections) {
+    collectionsData = collections;
+    activeCollections = new Set(collections.map(c => c.id));
+
+    const grid = document.getElementById('collections-grid');
+    const section = document.getElementById('collections-section');
+
+    if (collections.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    grid.innerHTML = '';
+
+    // Add "All" button first
+    const allItem = document.createElement('div');
+    allItem.className = 'collection-item';
+    allItem.textContent = 'All';
+    allItem.style.background = '#FFFFFF';
+    allItem.style.setProperty('--item-color', '#FFFFFF');
+    allItem.style.fontWeight = '600';
+
+    allItem.onclick = () => {
+        const items = grid.querySelectorAll('.collection-item:not(:first-child)');
+
+        if (activeCollections.size < collections.length) {
+            // Reactivate all collections
+            collections.forEach((collection, index) => {
+                activeCollections.add(collection.id);
+            });
+
+            // Update all collection items to active state
+            items.forEach((item, index) => {
+                const color = collectionColors[index % collectionColors.length];
+                item.style.background = color;
+                item.style.setProperty('--item-color', color);
+                item.classList.remove('inactive');
+            });
+
+            // Mark "All" button as active
+            allItem.style.background = '#FFFFFF';
+            allItem.style.setProperty('--item-color', '#FFFFFF');
+            allItem.classList.remove('inactive');
+        } else {
+            // Deactivate all collections
+            activeCollections.clear();
+
+            // Update all collection items to inactive state
+            items.forEach(item => {
+                item.style.setProperty('--item-color', 'var(--color-green-500)');
+                item.classList.add('inactive');
+            });
+
+            // Mark "All" button as inactive
+            allItem.style.setProperty('--item-color', 'var(--color-green-500)');
+            allItem.classList.add('inactive');
+        }
+    };
+
+    grid.appendChild(allItem);
+
+    collections.forEach((collection, index) => {
+        const item = document.createElement('div');
+        const itemColor = collectionColors[index % collectionColors.length];
+        item.className = 'collection-item';
+        item.dataset.id = collection.id;
+        item.textContent = collection.name;
+        item.style.background = itemColor;
+        item.style.setProperty('--item-color', itemColor);
+
+        item.onclick = () => {
+            if (activeCollections.has(collection.id)) {
+                activeCollections.delete(collection.id);
+                item.style.setProperty('--item-color', 'var(--color-green-500)');
+                item.classList.add('inactive');
+            } else {
+                activeCollections.add(collection.id);
+                item.style.background = itemColor;
+                item.style.setProperty('--item-color', itemColor);
+                item.classList.remove('inactive');
+            }
+
+            // Update "All" button state - active only when ALL collections are selected
+            if (activeCollections.size === collections.length) {
+                allItem.style.background = '#FFFFFF';
+                allItem.style.setProperty('--item-color', '#FFFFFF');
+                allItem.classList.remove('inactive');
+            } else {
+                allItem.style.setProperty('--item-color', 'var(--color-green-500)');
+                allItem.classList.add('inactive');
+            }
+        };
+
+        grid.appendChild(item);
+    });
+}
+
+// Draw donut chart with SVG
+function drawPieChart(used, unused) {
+    const svg = document.getElementById('pieChart');
+    const total = used + unused;
+
+    if (total === 0) {
+        document.getElementById('chart-percent').textContent = '-';
+        return;
+    }
+
+    // Clear previous content
+    svg.innerHTML = '';
+
+    const centerX = 30;
+    const centerY = 30;
+    const radius = 24;
+    const strokeWidth = 6;
+
+    // Calculate percentage and angles
+    const percent = Math.round((used / total) * 100);
+    const circumference = 2 * Math.PI * radius;
+    const usedLength = (used / total) * circumference;
+    const unusedLength = (unused / total) * circumference;
+
+    // Get CSS custom properties
+    const styles = getComputedStyle(document.documentElement);
+    const purpleColor = styles.getPropertyValue('--color-purple-500').trim();
+    const greenColor = styles.getPropertyValue('--color-green-500').trim();
+
+    // Create background circle (unused - green)
+    const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    bgCircle.setAttribute('cx', centerX);
+    bgCircle.setAttribute('cy', centerY);
+    bgCircle.setAttribute('r', radius);
+    bgCircle.setAttribute('fill', 'none');
+    bgCircle.setAttribute('stroke', greenColor);
+    bgCircle.setAttribute('stroke-width', strokeWidth);
+    bgCircle.setAttribute('stroke-linecap', 'butt');
+    svg.appendChild(bgCircle);
+
+    // Create progress circle (used - purple) if there are used variables
+    if (used > 0) {
+        const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        progressCircle.setAttribute('cx', centerX);
+        progressCircle.setAttribute('cy', centerY);
+        progressCircle.setAttribute('r', radius);
+        progressCircle.setAttribute('fill', 'none');
+        progressCircle.setAttribute('stroke', purpleColor);
+        progressCircle.setAttribute('stroke-width', strokeWidth);
+        progressCircle.setAttribute('stroke-linecap', 'butt');
+        progressCircle.setAttribute('stroke-dasharray', `${usedLength} ${circumference}`);
+        progressCircle.setAttribute('stroke-dashoffset', circumference / 4);
+        progressCircle.setAttribute('transform', `rotate(-90 ${centerX} ${centerY})`);
+        svg.appendChild(progressCircle);
+    }
+
+    // Update percentage
+    document.getElementById('chart-percent').textContent = percent + '%';
+}
+
+// Bouton Générer SCSS
+document.getElementById('generate').onclick = () => {
+    const onlyUsed = document.getElementById('onlyUsed').checked;
+
+    console.log('Envoi du message generate');
+
+    parent.postMessage({
+        pluginMessage: {
+            type: 'generate',
+            options: {
+                onlyUsed: onlyUsed,
+                selectedCollections: Array.from(activeCollections)
+            }
+        }
+    }, '*');
+};
+
+// Bouton Annuler SCSS
+document.getElementById('cancel').onclick = () => {
+    console.log('Envoi du message cancel');
+
+    parent.postMessage({
+        pluginMessage: {
+            type: 'cancel'
+        }
+    }, '*');
+};
+
+// Populate mapping dropdowns with variable groups
+function populateMappingDropdowns(variableGroups) {
+    const selects = document.querySelectorAll('.mapping-select');
+
+    // Keywords for auto-matching groups to mappings
+    const matchPatterns = {
+        'map-colors': ['color', 'colour', 'palette', 'couleur'],
+        'map-fontFamilies': ['family', 'families', 'font-family', 'typeface', 'police'],
+        'map-fontSizes': ['size', 'font-size', 'text-size', 'taille'],
+        'map-spacing': ['spacing', 'space', 'gap', 'margin', 'padding', 'espacement'],
+        'map-radius': ['radius', 'corner', 'round', 'border-radius', 'rayon']
+    };
+
+    selects.forEach(select => {
+        const selectId = select.id;
+        // Keep the first option (-- Sélectionner --)
+        select.innerHTML = '<option value="">-- Sélectionner --</option>';
+
+        // Filter groups based on the expected type for this mapping
+        let filteredGroups = variableGroups;
+
+        // Filter by type based on which mapping this is
+        if (selectId === 'map-colors') {
+            filteredGroups = variableGroups.filter(g => g.types.includes('COLOR'));
+        } else if (selectId === 'map-fontFamilies') {
+            filteredGroups = variableGroups.filter(g => g.types.includes('STRING'));
+        } else if (selectId === 'map-fontSizes' || selectId === 'map-spacing' || selectId === 'map-radius') {
+            filteredGroups = variableGroups.filter(g => g.types.includes('FLOAT'));
+        }
+
+        // Add groups as options with collection name prefix
+        let bestMatch = null;
+        const patterns = matchPatterns[selectId] || [];
+
+        filteredGroups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.collectionName + ' / ' + group.name;
+            select.appendChild(option);
+
+            // Check if group name matches any pattern for auto-selection
+            const groupNameLower = group.name.toLowerCase();
+            for (const pattern of patterns) {
+                if (groupNameLower.includes(pattern) || groupNameLower === pattern) {
+                    bestMatch = group.id;
+                    break;
+                }
+            }
+        });
+
+        // Auto-select the best match if found
+        if (bestMatch) {
+            select.value = bestMatch;
+        }
+    });
+}
+
+// Get current mappings
+function getMappings() {
+    return {
+        colors: document.getElementById('map-colors').value,
+        fontFamilies: document.getElementById('map-fontFamilies').value,
+        fontSizes: document.getElementById('map-fontSizes').value,
+        spacing: document.getElementById('map-spacing').value,
+        radius: document.getElementById('map-radius').value
+    };
+}
+
+// Bouton Générer theme.json
+document.getElementById('generateTheme').onclick = () => {
+    const mappings = getMappings();
+    const onlyUsed = document.getElementById('onlyUsedTheme').checked;
+
+    console.log('Envoi du message generate-theme avec mappings');
+
+    parent.postMessage({
+        pluginMessage: {
+            type: 'generate-theme',
+            mappings: mappings,
+            onlyUsed: onlyUsed
+        }
+    }, '*');
+};
+
+// Bouton Annuler theme.json
+document.getElementById('cancelTheme').onclick = () => {
+    parent.postMessage({
+        pluginMessage: {
+            type: 'cancel'
+        }
+    }, '*');
+};
+
+// Réception des messages depuis code.js
+window.onmessage = async (event) => {
+    const msg = event.data.pluginMessage;
+    console.log('Message reçu:', msg);
+
+    if (msg.type === 'initial-stats') {
+        // Update SCSS tab dashboard
+        document.getElementById('stat-total').textContent = msg.stats.total;
+        document.getElementById('stat-exported').textContent = msg.stats.exported;
+        document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+        document.getElementById('dashboard').classList.add('show');
+        document.getElementById('chart-hint').style.display = 'none';
+        drawPieChart(msg.stats.exported, msg.stats.skipped);
+
+        // Render collections grid
+        if (msg.collections) {
+            renderCollections(msg.collections);
+        }
+
+        // Populate mapping dropdowns with variable groups for theme.json tab
+        if (msg.variableGroups) {
+            populateMappingDropdowns(msg.variableGroups);
+        }
+    }
+
+    if (msg.type === 'download-multiple') {
+        // Créer un fichier ZIP contenant tous les fichiers
+        const zip = new JSZip();
+
+        msg.files.forEach(file => {
+            zip.file(file.filename, file.content);
+        });
+
+        // Générer et télécharger le ZIP
+        const zipBlob = await zip.generateAsync({type: 'blob'});
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'figma-scss-variables.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Afficher les stats si présentes
+        if (msg.stats) {
+            document.getElementById('stat-total').textContent = msg.stats.total;
+            document.getElementById('stat-exported').textContent = msg.stats.exported;
+            document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+            document.getElementById('dashboard').classList.add('show');
+
+            // Hide hint and draw pie chart
+            document.getElementById('chart-hint').style.display = 'none';
+            drawPieChart(msg.stats.exported, msg.stats.skipped);
+        }
+    }
+
+    if (msg.type === 'download-theme') {
+        // Download theme.json file
+        const blob = new Blob([msg.content], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'theme.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+};
+
+</script>
+</body>
+</html>

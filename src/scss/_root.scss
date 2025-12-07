@@ -1,0 +1,58 @@
+@import "variables";
+
+:root, body {
+  // ====================================
+  // PRIMITIVES
+  // ====================================
+
+  // Colors
+  @each $key, $val in $colors {
+    --color-#{$key}: #{$val};
+  }
+
+  // Spacing
+  @each $key, $val in $spacing {
+    --spacing-#{$key}: #{$val};
+  }
+
+  // Border radius
+  @each $key, $val in $radius {
+    --radius-#{$key}: #{$val};
+  }
+
+  // Font styles
+  --font-title-h1: 400 1.1rem #{$family-title};
+  --font-title-h2: 400 0.8rem #{$family-title};
+  --font-body-large: 400 1rem #{$family-body};
+  --font-body-medium: 400 0.85rem #{$family-body};
+  --font-body-medium-500: 400 0.85rem #{$family-body};
+  --font-body-small: 400 0.7rem #{$family-body};
+  --font-body-small-500: 400 0.7rem #{$family-body};
+
+  // ====================================
+  // ALIASES (Semantic tokens)
+  // ====================================
+
+  // Colors
+  --color-text-primary: var(--color-green-100);
+  --color-text-secondary: var(--color-green-200);
+  --color-text-invert: var(--color-green-800);
+  --color-components-btn-primary: var(--color-purple-500);
+  --color-components-btn-primaryhover: var(--color-purple-600);
+  --color-components-btn-secondary: var(--color-green-500);
+  --color-border-primary: var(--color-green-500);
+  --color-components-btn-secondaryhover: var(--color-green-500);
+  --color-surface-primary: var(--color-green-500);
+  --color-surface-bg: var(--color-green-800);
+  --color-icon-primary: var(--color-green-800);
+  --color-components-btn-disabled: var(--color-null);
+  --color-components-btn-primary-content: var(--color-green-800);
+  --color-components-btn-secondary-content: var(--color-text-primary);
+
+  // Spacing
+  --spacing-card-sm: var(--spacing-24);
+
+  // Border radius
+  --radius-border-radius-card: var(--radius-border-radius-8);
+
+}

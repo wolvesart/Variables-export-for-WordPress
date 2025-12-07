@@ -1,0 +1,42 @@
+.collections-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+
+  .collection-item {
+    padding: 12px 24px;
+    font: var(--font-body-medium-500);
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--color-text-invert);
+    user-select: none;
+    position: relative;
+
+    &:before, &:after {
+      content: '';
+      position: absolute;
+      height: 2px;
+      background: var(--item-color, #000000);
+      width: calc(100% - 4px);
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    &:before {
+      top: -2px;
+    }
+
+    &:after {
+      bottom: -2px;
+    }
+
+    &:hover {
+      opacity: 0.8;
+    }
+
+    &.inactive {
+      background: var(--color-green-500) !important;
+      color: var(--color-text-primary);
+    }
+  }
+}

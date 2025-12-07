@@ -1,0 +1,22 @@
+{
+  "name": "variables-export-for-wordpress",
+  "version": "1.0.0",
+  "description": "Figma plugin to export variables to SCSS and WordPress theme.json",
+  "scripts": {
+    "build": "node build.js",
+    "prod": "node build.js",
+    "watch": "node watch.js"
+  },
+  "devDependencies": {
+    "chokidar": "^3.5.3",
+    "sass": "^1.94.2"
+  },
+  "keywords": [
+    "figma",
+    "plugin",
+    "scss",
+    "wordpress",
+    "theme.json"
+  ],
+  "license": "MIT"
+}

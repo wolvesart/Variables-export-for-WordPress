@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* BUILD_CSS_PLACEHOLDER */
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <!-- Tabs Navigation -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="scss">Root + Variables</button>
+        <button class="tab-btn" data-tab="theme-json">theme.json</button>
+        <button class="tab-btn" data-tab="info">Info</button>
+    </div>
+
+    <!-- Tab 1: Root + Variables -->
+    <div class="tab-content active" id="tab-scss">
+        <section>
+            <div>
+                <h1>Exporter pour un child theme</h1>
+                <p>La fonction Variables.scss génère deux fichiers SCSS : _variables.scss et _root.scss. Le premier servira les map-get et le second les custom properties.</p>
+            </div>
+        </section>
+        <section>
+            <div class="dashboard" id="dashboard">
+                <div class="chart-wrapper">
+                    <svg id="pieChart" class="chart-canvas" viewBox="0 0 60 60"></svg>
+                    <div class="chart-percent" id="chart-percent">-</div>
+                </div>
+                <div class="chart-info">
+                    <div class="details">
+                        <span class="title">Total variables</span>
+                        <p class="result"><span id="stat-total">0</span> Variables</p>
+                    </div>
+                    <div class="details">
+                        <span class="title">Used/unused variables</span>
+                        <div class="chart-stats">
+                            <div class="chart-stat">
+                                <span class="dot used"></span>
+                                <p class="result"><span id="stat-exported">-</span> used</p>
+                            </div>
+                            <div class="chart-stat">
+                                <span class="dot unused"></span>
+                                <p class="result"><span id="stat-skipped">-</span> unused</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chart-hint"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="collections-section" style="display: none;">
+            <div class="section-title">Choisissez les collections à exporter</div>
+            <div class="collections-grid" id="collections-grid"></div>
+        </section>
+
+        <section>
+            <div class="section-title">Options d'export</div>
+            <label class="export-option" for="onlyUsed">
+                <p class="export-option-label">Exporter uniquement les variables utilisées</p>
+                <span class="custom-checkbox">
+                    <input type="checkbox" id="onlyUsed" checked>
+                    <span class="checkbox-box"></span>
+                </span>
+            </label>
+        </section>
+
+        <footer>
+            <div class="button-group">
+                <button class="secondary" id="cancel">Annuler</button>
+                <button class="primary" id="generate"><span class="icon"></span>Télécharger</button>
+            </div>
+            <div class="success" id="success">
+                ✅ Fichier généré avec succès ! Placez-le dans <code>assets/scss/</code>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Tab 2: theme.json -->
+    <div class="tab-content" id="tab-theme-json">
+        <section>
+            <div class="head">
+                <p>Associez vos collections Figma aux options theme.json de WordPress</p>
+            </div>
+        </section>
+
+        <section class="mapping-container" id="mapping-container">
+            <div class="mapping-section-title">Colors</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    color.palette
+                    <small>Palette de couleurs</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-colors">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Typography</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    typography.fontFamilies
+                    <small>Familles de polices</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-fontFamilies">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    typography.fontSizes
+                    <small>Tailles de texte</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-fontSizes">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Spacing</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    spacing.spacingSizes
+                    <small>Valeurs d'espacement</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-spacing">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Layout</div>
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    custom.radius
+                    <small>Border radius</small>
+                </div>
+                <span class="mapping-arrow">←</span>
+                <select class="mapping-select" id="map-radius">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+        </section>
+
+        <section>
+            <div class="section">
+                <label>Options d'export</label>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="onlyUsedTheme" checked>
+                    <label for="onlyUsedTheme">Exporter uniquement les variables utilisées</label>
+                </div>
+            </div>
+        </section>
+
+        <div class="button-group">
+            <button class="secondary" id="cancelTheme">Annuler</button>
+            <button class="primary" id="generateTheme"><span class="icon"></span>Générer theme.json</button>
+        </div>
+
+        <div class="success" id="success-theme">
+            ✅ theme.json généré avec succès !
+        </div>
+    </div>
+
+    <!-- Tab 3: Info -->
+    <div class="tab-content" id="tab-info">
+        <div class="info-tab">
+            <div class="info-logo">📦</div>
+            <div class="info-name">Variables export for WordPress</div>
+            <div class="info-version">Version 1.0.0</div>
+            <div class="info-description">
+                Export Figma variables to SCSS maps, CSS custom properties, and WordPress theme.json format.
+            </div>
+            <a href="https://github.com/your-repo/issues" target="_blank" class="info-link">🐛 Report a bug</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* BUILD_JS_PLACEHOLDER */
+</script>
+</body>
+</html>

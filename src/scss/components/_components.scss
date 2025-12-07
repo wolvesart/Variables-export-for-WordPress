@@ -1,0 +1,211 @@
+/* Component styles - Inputs, buttons, checkboxes */
+
+input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Monaco', monospace;
+  background: #1A1A1C;
+  color: #FFFFFF;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #18a0fb;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkbox-group label {
+  margin: 0;
+  font-size: 12px;
+  text-transform: none;
+  cursor: pointer;
+  font-weight: 400;
+  color: #FFFFFF;
+}
+
+/* Export option row with custom checkbox */
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-16);
+  padding: var(--spacing-16) 0;
+  border-top: 1px solid var(--color-green-500);
+  border-bottom: 1px solid var(--color-green-500);
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s;
+  text-transform: none;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.export-option-label {
+  flex: 1;
+  font: var(--font-body-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+  cursor: pointer;
+}
+
+.custom-checkbox {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+}
+
+.custom-checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.custom-checkbox .checkbox-box {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-green-200);
+  background: transparent;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.custom-checkbox input[type="checkbox"]:checked + .checkbox-box::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  background: var(--color-green-200);
+}
+
+.custom-checkbox input[type="checkbox"]:focus-visible + .checkbox-box {
+  outline: 2px solid var(--color-green-100);
+  outline-offset: 2px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+button {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  font: var(--font-body-medium-500);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+
+  // Lignes décoratives en haut et en bas
+  box-shadow:
+    inset 0 2px 0 0 transparent,
+    inset 0 -2px 0 0 transparent;
+}
+
+button::before,
+button::after {
+  content: '';
+  position: absolute;
+  height: 2px;
+  width: calc(100% - 4px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+button::before {
+  top: -2px;
+}
+
+button::after {
+  bottom: -2px;
+}
+
+.primary {
+  background: var(--color-purple-500);
+  color: var(--color-text-invert);
+
+  &::before, &::after {
+    background: var(--color-purple-500);
+  }
+}
+
+.primary:hover {
+  background: var(--color-purple-600);
+
+  &::before, &::after {
+    background: var(--color-purple-600);
+  }
+}
+
+#generate, #generateTheme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  // Pour ces boutons avec icône, on utilise une span pour l'icône
+  span.icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none'%3E%3Cpath d='M11.9167 15.5833V2.75H10.0833V11.9167H8.25V10.0833H6.41667V11.9167H8.25V13.75H10.0833V15.5833H11.9167ZM19.25 17.4167V13.75H17.4167V17.4167H4.58333V13.75H2.75V19.25H19.25V17.4167ZM11.9167 11.9167V13.75H13.75V11.9167H15.5833V10.0833H13.75V11.9167H11.9167Z' fill='currentcolor'/%3E%3C/svg%3E");
+    mask-repeat: no-repeat;
+    mask-size: contain;
+    mask-position: center;
+    background: currentColor;
+  }
+}
+
+.secondary {
+  background: var(--color-green-500);
+  color: var(--color-text-primary);
+
+  &::before, &::after {
+    background: var(--color-green-500);
+  }
+}
+
+.secondary:hover {
+  background: #194b50;
+
+  &::before, &::after {
+    background: #194b50;
+  }
+}
+
+.success {
+  background: #0fa958;
+  color: white;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 16px;
+  display: none;
+}
+
+.success.show {
+  display: block;
+  animation: slideIn 0.3s ease;
+}
