@@ -12,9 +12,8 @@
   ],
   "networkAccess": {
     "allowedDomains": [
-      "https://cdnjs.cloudflare.com",
-      "https://fonts.googleapis.com",
-      "https://fonts.gstatic.com"
-    ]
+      "none"
+    ],
+    "reasoning": "Le plugin fonctionne entièrement hors-ligne : la police et la bibliothèque de compression sont embarquées, et l'export des variables se fait en local. Aucune requête réseau ni envoi de données."
   }
 }

@@ -4,18 +4,26 @@
   box-sizing: border-box;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
-  padding: 16px;
   background: var(--color-surface-bg);
   color: var(--color-text-primary);
   font-family: 'Cascadia Code', Consolas, Monaco, 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.4;
+  overflow: hidden;
 }
 
 .container {
-  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 68px);
+  overflow-y: auto;
 }
+
 
 h1, h2, h3 {
   font-weight: 600;
@@ -36,8 +44,13 @@ p {
   color: var(--color-text-secondary);
 }
 
+a {
+  color: var(--color-text-primary);
+}
+
 section {
-  margin: 28px 0;
+  margin: 16px 0;
+  padding: 0 var(--spacing-section-w);
 }
 
 .section-title {
@@ -50,7 +63,6 @@ label {
   display: block;
   font-size: 11px;
   font-weight: 500;
-  margin-bottom: 8px;
   color: #999999;
   text-transform: uppercase;
   letter-spacing: 0.5px;

@@ -78,6 +78,8 @@ function renderCollections(collections) {
             allItem.style.setProperty('--item-color', 'var(--color-green-500)');
             allItem.classList.add('inactive');
         }
+
+        schedulePreview();
     };
 
     grid.appendChild(allItem);
@@ -112,6 +114,8 @@ function renderCollections(collections) {
                 allItem.style.setProperty('--item-color', 'var(--color-green-500)');
                 allItem.classList.add('inactive');
             }
+
+            schedulePreview();
         };
 
         grid.appendChild(item);
@@ -178,26 +182,149 @@ function drawPieChart(used, unused) {
     document.getElementById('chart-percent').textContent = percent + '%';
 }
 
-// Bouton Générer SCSS
+// Download button: build a ZIP with all export files (SCSS + DTCG)
 document.getElementById('generate').onclick = () => {
-    const onlyUsed = document.getElementById('onlyUsed').checked;
-
-    console.log('Envoi du message generate');
+    console.log('Sending generate message');
 
     parent.postMessage({
         pluginMessage: {
             type: 'generate',
             options: {
-                onlyUsed: onlyUsed,
-                selectedCollections: Array.from(activeCollections)
+                onlyUsed: document.getElementById('onlyUsed').checked,
+                selectedCollections: Array.from(activeCollections),
+                formats: { scss: true, dtcg: true }
             }
         }
     }, '*');
 };
 
-// Bouton Annuler SCSS
+// ---- Export preview: file lists with per-file copy / download ----
+let previewFiles = [];
+let previewTimer = null;
+
+// Ask code.js to (re)build the file set for the current options.
+function requestPreview() {
+    parent.postMessage({
+        pluginMessage: {
+            type: 'preview',
+            options: {
+                onlyUsed: document.getElementById('onlyUsed').checked,
+                selectedCollections: Array.from(activeCollections)
+            }
+        }
+    }, '*');
+}
+
+// Debounced: rapid collection toggles shouldn't trigger a burst of regenerations.
+function schedulePreview() {
+    setFileListsLoading();
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(requestPreview, 250);
+}
+
+function setFileListsLoading() {
+    ['scss-files-list', 'dtcg-files-list'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="file-list-empty">Generating preview…</div>';
+    });
+}
+
+// Render both file lists, dispatching each file to the right section by extension.
+function renderFileLists(files) {
+    previewFiles = files || [];
+    const scssList = document.getElementById('scss-files-list');
+    const dtcgList = document.getElementById('dtcg-files-list');
+    scssList.innerHTML = '';
+    dtcgList.innerHTML = '';
+
+    previewFiles.forEach(file => {
+        const target = file.filename.endsWith('.json') ? dtcgList : scssList;
+        target.appendChild(createFileRow(file));
+    });
+
+    if (!scssList.children.length) scssList.innerHTML = '<div class="file-list-empty">No SCSS file</div>';
+    if (!dtcgList.children.length) dtcgList.innerHTML = '<div class="file-list-empty">No token file</div>';
+}
+
+function createFileRow(file) {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+
+    const name = document.createElement('span');
+    name.className = 'file-name';
+    name.textContent = file.filename;
+
+    const actions = document.createElement('div');
+    actions.className = 'file-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'file-btn file-btn-copy';
+    copyBtn.title = 'Copy';
+    copyBtn.setAttribute('aria-label', 'Copy ' + file.filename);
+    copyBtn.innerHTML = '<span class="icon"></span>';
+    copyBtn.onclick = () => copyFileContent(file.content, copyBtn, file.filename);
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'file-btn file-btn-download';
+    dlBtn.title = 'Download';
+    dlBtn.setAttribute('aria-label', 'Download ' + file.filename);
+    dlBtn.innerHTML = '<span class="icon"></span>';
+    dlBtn.onclick = () => downloadSingleFile(file);
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(dlBtn);
+    row.appendChild(name);
+    row.appendChild(actions);
+    return row;
+}
+
+function copyFileContent(text, btn, filename) {
+    const done = () => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1200);
+        // Native Figma toast, triggered via code.js
+        parent.postMessage({
+            pluginMessage: { type: 'notify', message: '📋 ' + filename + ' copied to clipboard' }
+        }, '*');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+
+// Clipboard fallback for environments where navigator.clipboard is unavailable.
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+    if (done) done();
+}
+
+function downloadSingleFile(file) {
+    const blob = new Blob([file.content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Rebuild the preview whenever the "only used" option changes.
+document.getElementById('onlyUsed').addEventListener('change', schedulePreview);
+
+// Cancel button (SCSS)
 document.getElementById('cancel').onclick = () => {
-    console.log('Envoi du message cancel');
+    console.log('Sending cancel message');
 
     parent.postMessage({
         pluginMessage: {
@@ -221,8 +348,8 @@ function populateMappingDropdowns(variableGroups) {
 
     selects.forEach(select => {
         const selectId = select.id;
-        // Keep the first option (-- Sélectionner --)
-        select.innerHTML = '<option value="">-- Sélectionner --</option>';
+        // Keep the first option (-- Select --)
+        select.innerHTML = '<option value="">-- Select --</option>';
 
         // Filter groups based on the expected type for this mapping
         let filteredGroups = variableGroups;
@@ -274,12 +401,12 @@ function getMappings() {
     };
 }
 
-// Bouton Générer theme.json
+// Generate theme.json button
 document.getElementById('generateTheme').onclick = () => {
     const mappings = getMappings();
     const onlyUsed = document.getElementById('onlyUsedTheme').checked;
 
-    console.log('Envoi du message generate-theme avec mappings');
+    console.log('Sending generate-theme message with mappings');
 
     parent.postMessage({
         pluginMessage: {
@@ -290,7 +417,7 @@ document.getElementById('generateTheme').onclick = () => {
     }, '*');
 };
 
-// Bouton Annuler theme.json
+// Cancel theme.json button
 document.getElementById('cancelTheme').onclick = () => {
     parent.postMessage({
         pluginMessage: {
@@ -302,16 +429,17 @@ document.getElementById('cancelTheme').onclick = () => {
 // Réception des messages depuis code.js
 window.onmessage = async (event) => {
     const msg = event.data.pluginMessage;
-    console.log('Message reçu:', msg);
+    console.log('Message received:', msg);
 
     if (msg.type === 'initial-stats') {
-        // Update SCSS tab dashboard
+        // Lightweight stats: render the dashboard immediately. Used/unused counts
+        // arrive later via the 'usage-stats' message, so show a placeholder for now.
         document.getElementById('stat-total').textContent = msg.stats.total;
-        document.getElementById('stat-exported').textContent = msg.stats.exported;
-        document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+        document.getElementById('stat-exported').textContent = '…';
+        document.getElementById('stat-skipped').textContent = '…';
+        document.getElementById('chart-percent').textContent = '…';
         document.getElementById('dashboard').classList.add('show');
         document.getElementById('chart-hint').style.display = 'none';
-        drawPieChart(msg.stats.exported, msg.stats.skipped);
 
         // Render collections grid
         if (msg.collections) {
@@ -322,6 +450,21 @@ window.onmessage = async (event) => {
         if (msg.variableGroups) {
             populateMappingDropdowns(msg.variableGroups);
         }
+
+        // Build the initial export preview (file lists) in the background.
+        requestPreview();
+    }
+
+    if (msg.type === 'preview-files') {
+        // File set for the current options: populate the SCSS / DTCG lists.
+        renderFileLists(msg.files);
+    }
+
+    if (msg.type === 'usage-stats') {
+        // Follow-up to 'initial-stats': fill in used/unused counts and draw the chart.
+        document.getElementById('stat-exported').textContent = msg.stats.exported;
+        document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+        drawPieChart(msg.stats.exported, msg.stats.skipped);
     }
 
     if (msg.type === 'download-multiple') {
@@ -332,12 +475,12 @@ window.onmessage = async (event) => {
             zip.file(file.filename, file.content);
         });
 
-        // Générer et télécharger le ZIP
+        // Generate and download the ZIP
         const zipBlob = await zip.generateAsync({type: 'blob'});
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'figma-scss-variables.zip';
+        a.download = 'figma-variables-export.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

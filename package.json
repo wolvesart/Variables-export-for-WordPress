@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "chokidar": "^3.5.3",
+    "jszip": "^3.10.1",
     "sass": "^1.94.2"
   },
   "keywords": [

@@ -1,0 +1,123 @@
+/* Export preview: file lists with per-file copy / download actions */
+
+.section-desc {
+    font: var(--font-body-medium);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-16);
+}
+
+.file-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.file-list-empty {
+    padding: var(--spacing-16) 0;
+    font: var(--font-body-medium);
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+}
+
+.file-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-16);
+    padding: var(--spacing-16) 0;
+    border-top: 1px solid var(--color-green-500);
+    border-bottom: 1px solid var(--color-green-500);
+
+    /* Collapse doubled borders between consecutive rows */
+    & + .file-row {
+        margin-top: -1px;
+    }
+}
+
+.file-name {
+    flex: 1 0 0;
+    min-width: 0;
+    font: var(--font-body-medium);
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.file-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Small square action buttons. They reuse the global button notch decoration
+   (button::before / ::after); we only override the flex sizing and colours. */
+.file-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+}
+
+.file-btn .icon {
+    display: block;
+    width: 18px;
+    height: 18px;
+    background: currentColor;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+}
+
+.file-btn-copy .icon {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 20v2h-1v1H3v-1H2V6h1V5h3v15h10Z'/%3E%3Cpath d='M16 7V1H8v1H7v16h1v1h13v-1h1V7h-6Zm4 10H9V3h5v6h6v8Z'/%3E%3Cpath d='M22 5v1h-5V1h1v1h1v1h1v1h1v1h1Z'/%3E%3C/svg%3E%0A");
+}
+
+.file-btn-download .icon {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M13 17V3h-2v10H9v-2H7v2h2v2h2v2h2Zm8 2v-4h-2v4H5v-4H3v6h18v-2Zm-8-6v2h2v-2h2v-2h-2v2h-2Z'/%3E%3C/svg%3E%0A");
+}
+
+/* Copy = green, Download = purple (matching the Figma design) */
+.file-btn-copy {
+    background: var(--color-green-500);
+    color: var(--color-text-primary);
+
+    &::before, &::after {
+        background: var(--color-green-500);
+    }
+}
+
+.file-btn-copy:hover {
+    background: #194b50;
+
+    &::before, &::after {
+        background: #194b50;
+    }
+}
+
+.file-btn-copy.copied {
+    background: var(--color-green-200);
+    color: var(--color-text-invert);
+
+    &::before, &::after {
+        background: var(--color-green-200);
+    }
+}
+
+.file-btn-download {
+    background: var(--color-purple-500);
+    color: var(--color-text-invert);
+
+    &::before, &::after {
+        background: var(--color-purple-500);
+    }
+}
+
+.file-btn-download:hover {
+    background: var(--color-purple-600);
+
+    &::before, &::after {
+        background: var(--color-purple-600);
+    }
+}

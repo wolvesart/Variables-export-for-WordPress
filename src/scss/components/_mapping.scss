@@ -3,63 +3,83 @@
 .mapping-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-}
-
-.mapping-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    background: #1A1A1C;
-    border-radius: 6px;
-}
-
-.mapping-label {
-    flex: 1;
-    font-size: 11px;
-    font-weight: 500;
-    color: #FFFFFF;
-}
-
-.mapping-label small {
-    display: block;
-    font-size: 9px;
-    color: #666666;
-    font-weight: 400;
-    margin-top: 2px;
-}
-
-.mapping-select {
-    flex: 1;
-    padding: 6px 8px;
-    border: 1px solid #333333;
-    border-radius: 4px;
-    font-size: 11px;
-    background: #0F0F11;
-    color: #FFFFFF;
-    cursor: pointer;
-}
-
-.mapping-select:focus {
-    outline: none;
-    border-color: #18a0fb;
 }
 
 .mapping-section-title {
-    font-size: 10px;
-    font-weight: 600;
-    color: #666666;
+    font: var(--font-body-small);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 12px 0 8px;
+    margin: var(--spacing-24) 0 var(--spacing-16);
 }
 
 .mapping-section-title:first-child {
     margin-top: 0;
 }
 
+.mapping-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-24);
+    padding: var(--spacing-16) 0;
+    border-top: 1px solid var(--color-green-500);
+    border-bottom: 1px solid var(--color-green-500);
+
+    /* Collapse doubled borders between consecutive rows */
+    & + .mapping-row {
+        margin-top: -1px;
+    }
+}
+
+.mapping-label {
+    flex: 1 0 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--spacing-4);
+    font: var(--font-body-medium);
+    color: var(--color-text-primary);
+    text-transform: none;
+    letter-spacing: normal;
+    word-break: break-word;
+}
+
+.mapping-label small {
+    font: var(--font-body-small);
+    color: var(--color-text-secondary);
+}
+
 .mapping-arrow {
-    color: #666666;
-    font-size: 10px;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    background: var(--color-text-primary);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 11v2h12v2h2v-2h2v-2h-2V9h-2v2H4Zm10-4h2v2h-2V7Zm0 0h-2V5h2v2Zm0 10h2v-2h-2v2Zm0 0h-2v2h2v-2Z'/%3E%3C/svg%3E") no-repeat center;
+    mask-size: contain;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 11v2h12v2h2v-2h2v-2h-2V9h-2v2H4Zm10-4h2v2h-2V7Zm0 0h-2V5h2v2Zm0 10h2v-2h-2v2Zm0 0h-2v2h2v-2Z'/%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask-size: contain;
+}
+
+.mapping-select {
+    flex: 1 0 0;
+    min-width: 0;
+    padding: 12px 28px 12px 12px;
+    border: 1px solid var(--color-green-200);
+    border-radius: 0;
+    font: var(--font-body-medium);
+    color: var(--color-text-primary);
+    background-color: var(--color-green-500);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%23a6eddd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-8) center;
+    background-size: 20px 20px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.mapping-select:focus {
+    outline: none;
+    border-color: var(--color-text-primary);
 }

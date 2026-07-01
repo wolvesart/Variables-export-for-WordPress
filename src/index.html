@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* BUILD_CSS_PLACEHOLDER */
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>/* BUILD_VENDOR_JS_PLACEHOLDER */</script>
 </head>
 <body>
 <div class="container">
-    <!-- Tabs Navigation -->
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="scss">Root + Variables</button>
-        <button class="tab-btn" data-tab="theme-json">theme.json</button>
-        <button class="tab-btn" data-tab="info">Info</button>
-    </div>
+    <header>
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="scss">Variables.scss</button>
+            <button class="tab-btn" data-tab="theme-json">Theme.json</button>
+            <button class="tab-btn" data-tab="info">Info</button>
+        </div>
+    </header>
 
     <!-- Tab 1: Root + Variables -->
     <div class="tab-content active" id="tab-scss">
         <section>
             <div>
-                <h1>Exporter pour un child theme</h1>
-                <p>La fonction Variables.scss génère deux fichiers SCSS : _variables.scss et _root.scss. Le premier servira les map-get et le second les custom properties.</p>
+                <h1>Export for a child theme</h1>
+                <p>The Variables.scss feature generates two SCSS files: _variables.scss and _root.scss. The first
+                    powers the map-get calls and the second the custom properties.</p>
             </div>
         </section>
         <section>
@@ -56,14 +56,14 @@
         </section>
 
         <section id="collections-section" style="display: none;">
-            <div class="section-title">Choisissez les collections à exporter</div>
+            <div class="section-title">Choose the collections to export</div>
             <div class="collections-grid" id="collections-grid"></div>
         </section>
 
         <section>
-            <div class="section-title">Options d'export</div>
+            <div class="section-title">Export options</div>
             <label class="export-option" for="onlyUsed">
-                <p class="export-option-label">Exporter uniquement les variables utilisées</p>
+                <span class="export-option-label">Export only used variables</span>
                 <span class="custom-checkbox">
                     <input type="checkbox" id="onlyUsed" checked>
                     <span class="checkbox-box"></span>
@@ -71,13 +71,29 @@
             </label>
         </section>
 
+        <section>
+            <div class="section-title">SCSS Files</div>
+            <div class="file-list" id="scss-files-list">
+                <div class="file-list-empty">Generating preview…</div>
+            </div>
+        </section>
+
+        <section>
+            <div class="section-title">Design Tokens - DTCG</div>
+            <p class="section-desc">Standardized (W3C) format to share tokens between tools: Tokens Studio, Style
+                Dictionary…</p>
+            <div class="file-list" id="dtcg-files-list">
+                <div class="file-list-empty">Generating preview…</div>
+            </div>
+        </section>
+
         <footer>
             <div class="button-group">
-                <button class="secondary" id="cancel">Annuler</button>
-                <button class="primary" id="generate"><span class="icon"></span>Télécharger</button>
+                <button class="secondary" id="cancel">Cancel</button>
+                <button class="primary" id="generate"><span class="icon"></span>Download</button>
             </div>
             <div class="success" id="success">
-                ✅ Fichier généré avec succès ! Placez-le dans <code>assets/scss/</code>
+                ✅ File generated successfully! Place it in <code>assets/scss/</code>
             </div>
         </footer>
     </div>
@@ -85,101 +101,104 @@
     <!-- Tab 2: theme.json -->
     <div class="tab-content" id="tab-theme-json">
         <section>
-            <div class="head">
-                <p>Associez vos collections Figma aux options theme.json de WordPress</p>
+            <div>
+                <h1>Export to theme.json format</h1>
+                <p>Theme.json is a configuration file format specific to WordPress, used to define global design settings and styles for the Block Editor (Gutenberg).</p>
             </div>
         </section>
 
         <section class="mapping-container" id="mapping-container">
             <div class="mapping-section-title">Colors</div>
             <div class="mapping-row">
-                <div class="mapping-label">
-                    color.palette
-                    <small>Palette de couleurs</small>
+                <div class="mapping-label" id="label-map-colors">
+                    Color palette
                 </div>
-                <span class="mapping-arrow">←</span>
-                <select class="mapping-select" id="map-colors">
-                    <option value="">-- Sélectionner --</option>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-colors" aria-labelledby="label-map-colors">
+                    <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Typography</div>
             <div class="mapping-row">
-                <div class="mapping-label">
-                    typography.fontFamilies
-                    <small>Familles de polices</small>
+                <div class="mapping-label" id="label-map-fontFamilies">
+                    Font family
                 </div>
-                <span class="mapping-arrow">←</span>
-                <select class="mapping-select" id="map-fontFamilies">
-                    <option value="">-- Sélectionner --</option>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-fontFamilies" aria-labelledby="label-map-fontFamilies">
+                    <option value="">-- Select --</option>
                 </select>
             </div>
             <div class="mapping-row">
-                <div class="mapping-label">
-                    typography.fontSizes
-                    <small>Tailles de texte</small>
+                <div class="mapping-label" id="label-map-fontSizes">
+                    Font size
                 </div>
-                <span class="mapping-arrow">←</span>
-                <select class="mapping-select" id="map-fontSizes">
-                    <option value="">-- Sélectionner --</option>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-fontSizes" aria-labelledby="label-map-fontSizes">
+                    <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Spacing</div>
             <div class="mapping-row">
-                <div class="mapping-label">
-                    spacing.spacingSizes
-                    <small>Valeurs d'espacement</small>
+                <div class="mapping-label" id="label-map-spacing">
+                    Spacing sizes
                 </div>
-                <span class="mapping-arrow">←</span>
-                <select class="mapping-select" id="map-spacing">
-                    <option value="">-- Sélectionner --</option>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-spacing" aria-labelledby="label-map-spacing">
+                    <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Layout</div>
             <div class="mapping-row">
-                <div class="mapping-label">
-                    custom.radius
-                    <small>Border radius</small>
+                <div class="mapping-label" id="label-map-radius">
+                    Custom radius
                 </div>
-                <span class="mapping-arrow">←</span>
-                <select class="mapping-select" id="map-radius">
-                    <option value="">-- Sélectionner --</option>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-radius" aria-labelledby="label-map-radius">
+                    <option value="">-- Select --</option>
                 </select>
             </div>
         </section>
 
         <section>
-            <div class="section">
-                <label>Options d'export</label>
-                <div class="checkbox-group">
+            <div class="section-title">Export options</div>
+            <label class="export-option" for="onlyUsedTheme">
+                <span class="export-option-label">Export only used variables</span>
+                <span class="custom-checkbox">
                     <input type="checkbox" id="onlyUsedTheme" checked>
-                    <label for="onlyUsedTheme">Exporter uniquement les variables utilisées</label>
-                </div>
-            </div>
+                    <span class="checkbox-box"></span>
+                </span>
+            </label>
         </section>
 
-        <div class="button-group">
-            <button class="secondary" id="cancelTheme">Annuler</button>
-            <button class="primary" id="generateTheme"><span class="icon"></span>Générer theme.json</button>
-        </div>
-
-        <div class="success" id="success-theme">
-            ✅ theme.json généré avec succès !
-        </div>
+        <footer>
+            <div class="button-group">
+                <button class="secondary" id="cancelTheme">Cancel</button>
+                <button class="primary" id="generateTheme"><span class="icon"></span>Generate theme.json</button>
+            </div>
+            <div class="success" id="success-theme">
+                ✅ theme.json generated successfully!
+            </div>
+        </footer>
     </div>
 
     <!-- Tab 3: Info -->
     <div class="tab-content" id="tab-info">
         <div class="info-tab">
-            <div class="info-logo">📦</div>
-            <div class="info-name">Variables export for WordPress</div>
-            <div class="info-version">Version 1.0.0</div>
-            <div class="info-description">
-                Export Figma variables to SCSS maps, CSS custom properties, and WordPress theme.json format.
+            <div class="info-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" viewBox="0 0 128 128">
+                    <rect width="128" height="128" fill="#C2B7EF" rx="22"/>
+                    <path fill="#042C2F" d="M96 45.25v36.5L64 100 32 81.75v-36.5L64 27l32 18.25ZM64 52c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12Z"/>
+                </svg>
             </div>
-            <a href="https://github.com/your-repo/issues" target="_blank" class="info-link">🐛 Report a bug</a>
+            <div class="info-name">Variables export<br>for WordPress</div>
+            <div class="info-version">Version 1.0.0</div>
+            <footer>
+                <a href="https://github.com/your-repo/issues" target="_blank" class="info-link">Report a bug</a>
+                <a href="https://wolvesart.fr" target="_blank" class="info-link">Created by Wolvesart</a>
+            </footer>
         </div>
     </div>
 </div>

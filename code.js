@@ -4,20 +4,21 @@ console.log('Plugin started');
 
 figma.showUI(__html__, { width: 460, height: 650 });
 
+// Synthetic collection id representing Figma text & effect styles (which live
+// outside variable collections). When it isn't selected, styles are not exported.
+var STYLES_COLLECTION_ID = 'styles';
+
 // Send initial stats when plugin loads
 async function sendInitialStats() {
     try {
         var localVariables = await figma.variables.getLocalVariablesAsync();
         var collections = await figma.variables.getLocalVariableCollectionsAsync();
 
-        // Analyze usage
-        var usedVariableIds = await analyzeVariableUsage();
-
+        // Type counts (cheap — no document traversal needed)
         var colors = 0;
         var numbers = 0;
         var strings = 0;
         var booleans = 0;
-        var usedCount = 0;
 
         for (var i = 0; i < localVariables.length; i++) {
             var variable = localVariables[i];
@@ -25,13 +26,7 @@ async function sendInitialStats() {
             else if (variable.resolvedType === 'FLOAT') numbers++;
             else if (variable.resolvedType === 'STRING') strings++;
             else if (variable.resolvedType === 'BOOLEAN') booleans++;
-
-            if (usedVariableIds.has(variable.id)) {
-                usedCount++;
-            }
         }
-
-        var skippedCount = localVariables.length - usedCount;
 
         // Build collections array with id and name
         var collectionsArray = [];
@@ -40,6 +35,14 @@ async function sendInitialStats() {
                 id: collections[c].id,
                 name: collections[c].name
             });
+        }
+
+        // Add a synthetic "Styles" collection for text & effect styles, which live
+        // outside variable collections. Deselecting it excludes them from the export.
+        var localTextStyles = await figma.getLocalTextStylesAsync();
+        var localEffectStyles = await figma.getLocalEffectStylesAsync();
+        if (localTextStyles.length > 0 || localEffectStyles.length > 0) {
+            collectionsArray.push({ id: STYLES_COLLECTION_ID, name: 'Styles' });
         }
 
         // Build variable groups (first segment of variable name)
@@ -87,12 +90,12 @@ async function sendInitialStats() {
             });
         }
 
+        // 1) Send the lightweight stats right away so the UI renders immediately,
+        //    without waiting for the expensive whole-document usage analysis.
         figma.ui.postMessage({
             type: 'initial-stats',
             stats: {
                 total: localVariables.length,
-                exported: usedCount,
-                skipped: skippedCount,
                 collections: collections.length,
                 colors: colors,
                 numbers: numbers,
@@ -101,6 +104,22 @@ async function sendInitialStats() {
             },
             collections: collectionsArray,
             variableGroups: variableGroups
+        });
+
+        // 2) Compute variable usage in the background, then send a follow-up
+        //    update that fills in the used/unused counts and the donut chart.
+        var usedVariableIds = await analyzeVariableUsage();
+        var usedCount = 0;
+        for (var uc = 0; uc < localVariables.length; uc++) {
+            if (usedVariableIds.has(localVariables[uc].id)) usedCount++;
+        }
+
+        figma.ui.postMessage({
+            type: 'usage-stats',
+            stats: {
+                exported: usedCount,
+                skipped: localVariables.length - usedCount
+            }
         });
     } catch (error) {
         console.error('Error loading initial stats:', error);
@@ -197,8 +216,71 @@ async function extractTextStyles() {
     return extractedStyles;
 }
 
+// Extract effect styles (drop/inner shadows) and turn them into CSS box-shadow values
+async function extractEffectStyles() {
+    console.log('Extracting effect styles...');
+
+    var effectStyles = await figma.getLocalEffectStylesAsync();
+    var shadows = [];
+
+    for (var i = 0; i < effectStyles.length; i++) {
+        var style = effectStyles[i];
+        var cssLayers = [];        // for SCSS (box-shadow string)
+        var structuredLayers = []; // for DTCG (shadow composite)
+
+        for (var e = 0; e < style.effects.length; e++) {
+            var eff = style.effects[e];
+            if (eff.visible === false) continue;
+            if (eff.type !== 'DROP_SHADOW' && eff.type !== 'INNER_SHADOW') continue;
+
+            var isInset = eff.type === 'INNER_SHADOW';
+            var x = Math.round(eff.offset.x) + 'px';
+            var y = Math.round(eff.offset.y) + 'px';
+            var blur = Math.round(eff.radius) + 'px';
+            var spread = Math.round(eff.spread || 0) + 'px';
+            var color = rgbaToHex(eff.color);
+            cssLayers.push((isInset ? 'inset ' : '') + x + ' ' + y + ' ' + blur + ' ' + spread + ' ' + color);
+            structuredLayers.push({ offsetX: x, offsetY: y, blur: blur, spread: spread, color: color, inset: isInset });
+        }
+
+        if (cssLayers.length === 0) continue;
+
+        var nameParts = style.name.split('/');
+        var folder = nameParts.length > 1 ? nameParts[0].trim() : '';
+        var styleName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : style.name;
+        var normalizedFolder = folder.toLowerCase().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+        var normalizedName = styleName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+        var fullName = normalizedFolder ? normalizedFolder + '-' + normalizedName : normalizedName;
+
+        shadows.push({
+            name: fullName,
+            originalName: style.name,
+            value: cssLayers.join(', '),
+            layers: structuredLayers,
+            originalIndex: i
+        });
+    }
+
+    console.log('Effect styles extracted: ' + shadows.length);
+    return shadows;
+}
+
+// Session cache for the variable-usage analysis.
+// Traversing every node on every page (after loadAllPagesAsync) is expensive on
+// large files — the Figma docs warn it causes a significant delay. We therefore
+// compute it once and reuse the result, invalidating only when the document
+// actually changes (see the documentchange listener below).
+var usedVariableIdsCache = null;
+var documentChangeListenerRegistered = false;
+
 // Analyze variable usage in the document
 async function analyzeVariableUsage() {
+    // Reuse the cached result when the document hasn't changed since last analysis.
+    if (usedVariableIdsCache) {
+        console.log('Reusing cached variable usage (' + usedVariableIdsCache.size + ' used)');
+        return usedVariableIdsCache;
+    }
+
     console.log('Analyzing variable usage...');
 
     var usedVariableIds = new Set();
@@ -247,6 +329,16 @@ async function analyzeVariableUsage() {
         await figma.loadAllPagesAsync();
     }
 
+    // Register the cache-invalidation listener once — in incremental (dynamic-page)
+    // mode, documentchange can only be registered after loadAllPagesAsync.
+    if (!documentChangeListenerRegistered) {
+        documentChangeListenerRegistered = true;
+        figma.on('documentchange', function() {
+            usedVariableIdsCache = null;
+            _localVarByIdCache = null;
+        });
+    }
+
     // Traverse all pages
     var pages = figma.root.children;
     for (var p = 0; p < pages.length; p++) {
@@ -257,7 +349,24 @@ async function analyzeVariableUsage() {
 
     console.log('Used variables found: ' + usedVariableIds.size);
 
+    usedVariableIdsCache = usedVariableIds;
     return usedVariableIds;
+}
+
+// In-memory cache of local variables keyed by id, so alias resolution is a plain
+// lookup instead of an async API round-trip per alias. Non-local (library)
+// variables that aren't in the local set fall back to the async API.
+var _localVarByIdCache = null;
+async function getVariableByIdCached(id) {
+    if (!_localVarByIdCache) {
+        var locals = await figma.variables.getLocalVariablesAsync();
+        _localVarByIdCache = {};
+        for (var i = 0; i < locals.length; i++) {
+            _localVarByIdCache[locals[i].id] = locals[i];
+        }
+    }
+    if (_localVarByIdCache[id]) return _localVarByIdCache[id];
+    return await figma.variables.getVariableByIdAsync(id);
 }
 
 // Resolve alias value recursively
@@ -267,8 +376,8 @@ async function resolveAliasValue(value, resolvedType) {
         return value;
     }
 
-    // Get the referenced variable
-    var referencedVar = await figma.variables.getVariableByIdAsync(value.id);
+    // Get the referenced variable (from the in-memory cache when possible)
+    var referencedVar = await getVariableByIdCached(value.id);
     if (!referencedVar) {
         console.log('Alias variable not found:', value.id);
         return null;
@@ -307,9 +416,12 @@ async function extractVariables(onlyUsed, selectedCollections) {
     }
 
     // Build a map of variable ID to normalized name for alias resolution
+    // and to the original (slash-separated) name for DTCG references.
     var variableIdToName = {};
+    var variableIdToOriginalName = {};
     for (var v = 0; v < localVariables.length; v++) {
         variableIdToName[localVariables[v].id] = normalizeVariableName(localVariables[v].name);
+        variableIdToOriginalName[localVariables[v].id] = localVariables[v].name;
     }
 
     var variables = {
@@ -353,11 +465,13 @@ async function extractVariables(onlyUsed, selectedCollections) {
         // Check if this is an alias
         var isAlias = rawValue && typeof rawValue === 'object' && rawValue.type === 'VARIABLE_ALIAS';
         var referencedVarName = null;
+        var referencedVarOriginalName = null;
         var value = rawValue;
 
         if (isAlias) {
-            // Get the referenced variable name
+            // Get the referenced variable name (normalized + original for DTCG references)
             referencedVarName = variableIdToName[rawValue.id];
+            referencedVarOriginalName = variableIdToOriginalName[rawValue.id];
             // Resolve the alias to get the actual value for type checking
             value = await resolveAliasValue(rawValue, variable.resolvedType);
         }
@@ -378,6 +492,7 @@ async function extractVariables(onlyUsed, selectedCollections) {
             isUsed: usedVariableIds.has(variable.id),
             isAlias: isAlias,
             referencedVarName: referencedVarName,
+            referencedVarOriginalName: referencedVarOriginalName,
             originalIndex: i
         };
 
@@ -387,7 +502,9 @@ async function extractVariables(onlyUsed, selectedCollections) {
                 variables.colors.push(varData);
             }
         } else if (variable.resolvedType === 'FLOAT') {
-            varData.scssValue = value + 'px';
+            varData.scssValue = (typeof value === 'number')
+                ? formatNumberValue(classifyNumber(variable.name), value)
+                : String(value);
             variables.numbers.push(varData);
         } else if (variable.resolvedType === 'STRING') {
             varData.scssValue = '"' + value + '"';
@@ -400,13 +517,27 @@ async function extractVariables(onlyUsed, selectedCollections) {
 
     console.log('Variables extraites: colors=' + variables.colors.length + ' numbers=' + variables.numbers.length + ' strings=' + variables.strings.length + ' booleans=' + variables.booleans.length + ' skipped=' + skippedCount);
 
+    // Text & effect styles are gated by the synthetic "Styles" collection: include
+    // them only when it's selected (or when no collection filter is applied at all).
+    var includeStyles = !selectedCollectionIds || selectedCollectionIds.has(STYLES_COLLECTION_ID);
+
     // Extract text styles
-    var textStyles = await extractTextStyles();
+    var textStyles = includeStyles ? await extractTextStyles() : [];
+
+    // Extract effect styles (shadows)
+    var shadows = includeStyles ? await extractEffectStyles() : [];
+
+    // Build mode data (themes / brands) for multi-mode collections
+    var modes = buildModes(localVariables, collections, selectedCollectionIds, onlyUsed, usedVariableIds, variableIdToOriginalName);
 
     return {
         variables: variables,
         collections: collections,
         textStyles: textStyles,
+        shadows: shadows,
+        modeData: modes.modeData,
+        modeTokenSets: modes.modeTokenSets,
+        uniqueModeNames: modes.uniqueModeNames,
         totalVariables: localVariables.length,
         exportedVariables: localVariables.length - skippedCount,
         skippedVariables: skippedCount
@@ -418,16 +549,220 @@ function pxToRem(value) {
     return (value / 16).toFixed(value % 16 === 0 ? 0 : 2).replace(/\.?0+$/, '') + 'rem';
 }
 
-// Determine numeric variable type (spacing, radius, etc.)
-function getNumberType(name) {
-    var lowerName = name.toLowerCase();
-    if (lowerName.indexOf('radius') !== -1 || lowerName.indexOf('corner') !== -1 || lowerName.indexOf('round') !== -1) {
-        return 'radius';
-    }
-    if (lowerName.indexOf('breakpoint') !== -1 || lowerName.indexOf('screen') !== -1) {
-        return 'breakpoints';
-    }
+// Classify a numeric (FLOAT) variable into a semantic category based on its name.
+// This drives both the chosen unit (rem / px / unitless) and the output grouping.
+function classifyNumber(name) {
+    var n = name.toLowerCase();
+
+    // --- Unitless categories (must NOT get a px/rem suffix) ---
+    if (n.indexOf('opacity') !== -1 || n.indexOf('alpha') !== -1) return 'opacity';
+    if (n.indexOf('font-weight') !== -1 || n.indexOf('fontweight') !== -1 || n.indexOf('weight') !== -1) return 'font-weight';
+    if (n.indexOf('z-index') !== -1 || n.indexOf('zindex') !== -1 || n.indexOf('z-order') !== -1) return 'z-index';
+    if (n.indexOf('line-height') !== -1 || n.indexOf('lineheight') !== -1 || n.indexOf('leading') !== -1) return 'line-height';
+
+    // --- Dimensional categories ---
+    if (n.indexOf('breakpoint') !== -1 || n.indexOf('screen') !== -1) return 'breakpoints';
+    if (n.indexOf('radius') !== -1 || n.indexOf('corner') !== -1 || n.indexOf('round') !== -1) return 'radius';
+    if (n.indexOf('border-width') !== -1) return 'border-width';
+    if ((n.indexOf('border') !== -1 || n.indexOf('stroke') !== -1) && n.indexOf('width') !== -1) return 'border-width';
+    if (n.indexOf('sizing') !== -1 || n.indexOf('size') !== -1 || n.indexOf('width') !== -1 || n.indexOf('height') !== -1 || n.indexOf('icon') !== -1) return 'sizing';
+
     return 'spacing';
+}
+
+// Format a numeric value according to its semantic category.
+// Fixes the previous bug where every FLOAT was suffixed with "px".
+function formatNumberValue(category, value) {
+    if (category === 'opacity') {
+        return String(value); // 0..1, unitless
+    }
+    if (category === 'font-weight' || category === 'z-index') {
+        return String(Math.round(value)); // unitless integer
+    }
+    if (category === 'line-height') {
+        // Ratio (e.g. 1.5) stays unitless; an absolute value falls back to rem.
+        return value <= 4 ? String(value) : pxToRem(value);
+    }
+    if (category === 'breakpoints') {
+        return Math.round(value) + 'px'; // px required (media queries can't use rem reliably)
+    }
+    if (category === 'border-width') {
+        return value + 'px'; // hairlines stay crisp in px
+    }
+    // spacing, sizing, radius
+    return pxToRem(value);
+}
+
+// CSS custom-property prefixes per numeric category (shared by SCSS output and mode overrides).
+var NUMBER_CSS_PREFIX = {
+    'spacing': 'spacing',
+    'sizing': 'size',
+    'radius': 'radius',
+    'border-width': 'border-width',
+    'breakpoints': 'breakpoint',
+    'opacity': 'opacity',
+    'font-weight': 'font-weight',
+    'line-height': 'line-height',
+    'z-index': 'z-index'
+};
+
+// Normalize a collection/mode name for use in selectors and filenames.
+function normalizeNamePart(name) {
+    return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+}
+
+// Build the CSS custom-property NAME for a variable (null if it isn't emitted in :root).
+function cssVarNameFor(variable) {
+    var normalized = normalizeVariableName(variable.name);
+    if (variable.resolvedType === 'COLOR') {
+        return '--color-' + removeTypePrefix(normalized, 'color');
+    }
+    if (variable.resolvedType === 'FLOAT') {
+        var cat = classifyNumber(variable.name);
+        if (cat === 'breakpoints') return null; // breakpoints are SCSS-only
+        var prefix = NUMBER_CSS_PREFIX[cat];
+        return '--' + prefix + '-' + removeTypePrefix(normalized, prefix);
+    }
+    return null; // strings/booleans are not emitted as themeable custom properties
+}
+
+// Compute the effective CSS value of a variable for a given raw mode value.
+// Aliases become var(--ref) references (mode-stable); literals are formatted.
+function effectiveCssValue(variable, raw, idToVar) {
+    if (raw && typeof raw === 'object' && raw.type === 'VARIABLE_ALIAS') {
+        var refVar = idToVar[raw.id];
+        if (!refVar) return null;
+        var refName = cssVarNameFor(refVar);
+        return refName ? 'var(' + refName + ')' : null;
+    }
+    if (variable.resolvedType === 'COLOR') {
+        return (raw && typeof raw === 'object' && 'r' in raw) ? rgbaToHex(raw) : null;
+    }
+    if (variable.resolvedType === 'FLOAT') {
+        if (typeof raw !== 'number' || isNaN(raw)) return null;
+        var cat = classifyNumber(variable.name);
+        if (cat === 'breakpoints') return null;
+        return formatNumberValue(cat, raw);
+    }
+    return null;
+}
+
+// Build mode data for collections that have more than one mode:
+//  - modeData      : CSS overrides per axis (collection) and mode, only what differs from default
+//  - modeTokenSets : full DTCG variable arrays resolved per non-default mode name
+//  - uniqueModeNames: distinct non-default mode names (drive the per-mode tokens.<mode>.json files)
+function buildModes(localVariables, collections, selectedCollectionIds, onlyUsed, usedVariableIds, idToOriginalName) {
+    var idToVar = {};
+    for (var i = 0; i < localVariables.length; i++) idToVar[localVariables[i].id] = localVariables[i];
+    var collById = {};
+    for (var c = 0; c < collections.length; c++) collById[collections[c].id] = collections[c];
+
+    function included(variable) {
+        if (selectedCollectionIds && !selectedCollectionIds.has(variable.variableCollectionId)) return false;
+        if (onlyUsed && !usedVariableIds.has(variable.id)) return false;
+        return true;
+    }
+
+    var modeData = [];
+    var modeTokenSets = {};
+    var uniqueModeNames = [];
+    var seenModeName = {};
+
+    for (var ci = 0; ci < collections.length; ci++) {
+        var collection = collections[ci];
+        if (!collection.modes || collection.modes.length <= 1) continue;
+        var defaultModeId = collection.defaultModeId;
+
+        var collVars = [];
+        for (var vi = 0; vi < localVariables.length; vi++) {
+            var vv = localVariables[vi];
+            if (vv.variableCollectionId !== collection.id) continue;
+            if (!included(vv)) continue;
+            collVars.push(vv);
+        }
+        if (collVars.length === 0) continue;
+
+        var axis = {
+            collectionName: collection.name,
+            attribute: 'data-' + normalizeNamePart(collection.name),
+            modes: []
+        };
+
+        for (var mi = 0; mi < collection.modes.length; mi++) {
+            var mode = collection.modes[mi];
+            if (mode.modeId === defaultModeId) continue;
+
+            if (!seenModeName[mode.name]) {
+                seenModeName[mode.name] = true;
+                uniqueModeNames.push(mode.name);
+            }
+
+            var props = [];
+            for (var k = 0; k < collVars.length; k++) {
+                var variable = collVars[k];
+                var cssVar = cssVarNameFor(variable);
+                if (!cssVar) continue;
+                var modeRaw = variable.valuesByMode[mode.modeId];
+                if (modeRaw === undefined) continue;
+                var defRaw = variable.valuesByMode[defaultModeId];
+                var modeVal = effectiveCssValue(variable, modeRaw, idToVar);
+                var defVal = effectiveCssValue(variable, defRaw, idToVar);
+                if (modeVal !== null && modeVal !== defVal) {
+                    props.push({ cssVar: cssVar, value: modeVal });
+                }
+            }
+
+            axis.modes.push({
+                modeName: mode.name,
+                attrValue: normalizeNamePart(mode.name),
+                props: props
+            });
+        }
+
+        if (axis.modes.length > 0) modeData.push(axis);
+    }
+
+    // Full DTCG token sets per unique non-default mode name
+    for (var u = 0; u < uniqueModeNames.length; u++) {
+        var modeName = uniqueModeNames[u];
+        var arrays = { colors: [], numbers: [], strings: [], booleans: [] };
+
+        for (var vj = 0; vj < localVariables.length; vj++) {
+            var v2 = localVariables[vj];
+            if (!included(v2)) continue;
+            var coll = collById[v2.variableCollectionId];
+            if (!coll) continue;
+
+            var chosenModeId = coll.defaultModeId;
+            for (var mm = 0; mm < coll.modes.length; mm++) {
+                if (coll.modes[mm].name === modeName && v2.valuesByMode[coll.modes[mm].modeId] !== undefined) {
+                    chosenModeId = coll.modes[mm].modeId;
+                    break;
+                }
+            }
+            var raw2 = v2.valuesByMode[chosenModeId];
+            if (raw2 === undefined) raw2 = v2.valuesByMode[coll.defaultModeId];
+
+            var isAliasMode = raw2 && typeof raw2 === 'object' && raw2.type === 'VARIABLE_ALIAS';
+            if (!isAliasMode && raw2 === undefined) continue;
+
+            var item = {
+                name: v2.name,
+                value: isAliasMode ? null : raw2,
+                isAlias: isAliasMode,
+                referencedVarOriginalName: isAliasMode ? idToOriginalName[raw2.id] : null
+            };
+
+            if (v2.resolvedType === 'COLOR') arrays.colors.push(item);
+            else if (v2.resolvedType === 'FLOAT') arrays.numbers.push(item);
+            else if (v2.resolvedType === 'STRING') arrays.strings.push(item);
+            else if (v2.resolvedType === 'BOOLEAN') arrays.booleans.push(item);
+        }
+
+        modeTokenSets[modeName] = arrays;
+    }
+
+    return { modeData: modeData, modeTokenSets: modeTokenSets, uniqueModeNames: uniqueModeNames };
 }
 
 // Generate content for both SCSS files
@@ -436,18 +771,33 @@ function generateScssFiles(data, options) {
 
     var variables = data.variables;
     var textStyles = data.textStyles || [];
+    var shadows = data.shadows || [];
 
     // Separate primitives and aliases for each type
     var colorPrimitives = [];
     var colorAliases = [];
-    var spacingPrimitives = [];
-    var spacingAliases = [];
-    var radiusPrimitives = [];
-    var radiusAliases = [];
-    var breakpointsPrimitives = [];
-    var breakpointsAliases = [];
     var stringsPrimitives = [];
     var stringsAliases = [];
+
+    // Number categories (data-driven). The order defines the output order.
+    // cssPrefix: used both to strip the type prefix from names and to build CSS var names.
+    // inRoot: whether the category is emitted as a CSS custom property (breakpoints are SCSS-only).
+    var numberCategoryOrder = ['spacing', 'sizing', 'radius', 'border-width', 'breakpoints', 'opacity', 'font-weight', 'line-height', 'z-index'];
+    var numberCategoryMeta = {
+        'spacing':      { label: 'SPACING',       cssPrefix: 'spacing',      inRoot: true },
+        'sizing':       { label: 'SIZING',        cssPrefix: 'size',         inRoot: true },
+        'radius':       { label: 'BORDER RADIUS', cssPrefix: 'radius',       inRoot: true },
+        'border-width': { label: 'BORDER WIDTH',  cssPrefix: 'border-width', inRoot: true },
+        'breakpoints':  { label: 'BREAKPOINTS',   cssPrefix: 'breakpoint',   inRoot: false },
+        'opacity':      { label: 'OPACITY',       cssPrefix: 'opacity',      inRoot: true },
+        'font-weight':  { label: 'FONT WEIGHT',   cssPrefix: 'font-weight',  inRoot: true },
+        'line-height':  { label: 'LINE HEIGHT',   cssPrefix: 'line-height',  inRoot: true },
+        'z-index':      { label: 'Z-INDEX',       cssPrefix: 'z-index',      inRoot: true }
+    };
+    var numberGroups = {};
+    for (var ncInit = 0; ncInit < numberCategoryOrder.length; ncInit++) {
+        numberGroups[numberCategoryOrder[ncInit]] = { primitives: [], aliases: [] };
+    }
 
     // Process colors
     for (var i = 0; i < variables.colors.length; i++) {
@@ -470,10 +820,9 @@ function generateScssFiles(data, options) {
     colorPrimitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
     colorAliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
 
-    // Process numbers (spacing, radius, breakpoints)
+    // Process numbers (spacing, sizing, radius, border-width, breakpoints, opacity, font-weight, line-height, z-index)
     for (var j = 0; j < variables.numbers.length; j++) {
         var num = variables.numbers[j];
-        var numType = getNumberType(num.name);
         var numValue = num.value;
 
         // Check that value is a valid number
@@ -482,44 +831,29 @@ function generateScssFiles(data, options) {
             continue;
         }
 
-        var typePrefix = numType === 'breakpoints' ? 'breakpoint' : (numType === 'radius' ? 'radius' : 'spacing');
+        var category = classifyNumber(num.name);
+        var meta = numberCategoryMeta[category];
         var numData = {
-            key: removeTypePrefix(num.normalizedName, typePrefix),
-            numKey: Math.round(numValue),
-            value: numType === 'breakpoints' ? numValue + 'px' : pxToRem(numValue),
+            key: removeTypePrefix(num.normalizedName, meta.cssPrefix),
+            value: formatNumberValue(category, numValue),
             originalName: num.name,
-            referencedVarName: num.referencedVarName ? removeTypePrefix(num.referencedVarName, typePrefix) : null,
+            referencedVarName: num.referencedVarName ? removeTypePrefix(num.referencedVarName, meta.cssPrefix) : null,
             originalIndex: num.originalIndex
         };
 
-        if (numType === 'breakpoints') {
-            if (num.isAlias) {
-                breakpointsAliases.push(numData);
-            } else {
-                breakpointsPrimitives.push(numData);
-            }
-        } else if (numType === 'radius') {
-            if (num.isAlias) {
-                radiusAliases.push(numData);
-            } else {
-                radiusPrimitives.push(numData);
-            }
+        if (num.isAlias) {
+            numberGroups[category].aliases.push(numData);
         } else {
-            if (num.isAlias) {
-                spacingAliases.push(numData);
-            } else {
-                spacingPrimitives.push(numData);
-            }
+            numberGroups[category].primitives.push(numData);
         }
     }
 
-    // Sort by original Figma order instead of numeric value
-    spacingPrimitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
-    spacingAliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
-    radiusPrimitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
-    radiusAliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
-    breakpointsPrimitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
-    breakpointsAliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
+    // Sort each group by original Figma order instead of numeric value
+    for (var sortIdx = 0; sortIdx < numberCategoryOrder.length; sortIdx++) {
+        var sortGrp = numberGroups[numberCategoryOrder[sortIdx]];
+        sortGrp.primitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
+        sortGrp.aliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
+    }
 
     // Process strings
     for (var k = 0; k < variables.strings.length; k++) {
@@ -542,6 +876,18 @@ function generateScssFiles(data, options) {
     // Sort strings by original Figma order
     stringsPrimitives.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
     stringsAliases.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
+
+    // Process booleans (SCSS-only: a CSS custom property for a boolean is meaningless)
+    var booleanVars = [];
+    for (var bIdx = 0; bIdx < variables.booleans.length; bIdx++) {
+        var bool = variables.booleans[bIdx];
+        booleanVars.push({
+            key: bool.normalizedName,
+            value: bool.scssValue,
+            originalIndex: bool.originalIndex
+        });
+    }
+    booleanVars.sort(function(a, b) { return a.originalIndex - b.originalIndex; });
 
     // ========================================
     // Generate _variables.scss (PRIMITIVES ONLY)
@@ -622,30 +968,43 @@ function generateScssFiles(data, options) {
         variablesScss += ');\n\n';
     }
 
-    // Spacing map - primitives only
-    if (spacingPrimitives.length > 0) {
+    // Number maps - primitives only (data-driven: spacing, sizing, radius, border-width, breakpoints, opacity...)
+    for (var mapIdx = 0; mapIdx < numberCategoryOrder.length; mapIdx++) {
+        var mapCat = numberCategoryOrder[mapIdx];
+        var mapPrims = numberGroups[mapCat].primitives;
+        if (mapPrims.length === 0) continue;
+
         variablesScss += '// ====================================\n';
-        variablesScss += '// SPACING\n';
+        variablesScss += '// ' + numberCategoryMeta[mapCat].label + '\n';
         variablesScss += '// ====================================\n\n';
-        variablesScss += '$spacing: (\n';
-        for (var sp = 0; sp < spacingPrimitives.length; sp++) {
-            variablesScss += '        ' + spacingPrimitives[sp].key + ': ' + spacingPrimitives[sp].value;
-            variablesScss += (sp < spacingPrimitives.length - 1) ? ',\n' : '\n';
+        variablesScss += '$' + mapCat + ': (\n';
+        for (var mp = 0; mp < mapPrims.length; mp++) {
+            variablesScss += '        ' + mapPrims[mp].key + ': ' + mapPrims[mp].value;
+            variablesScss += (mp < mapPrims.length - 1) ? ',\n' : '\n';
         }
         variablesScss += ');\n\n';
     }
 
-    // Radius map - primitives only
-    if (radiusPrimitives.length > 0) {
+    // Booleans - simple SCSS variables
+    if (booleanVars.length > 0) {
         variablesScss += '// ====================================\n';
-        variablesScss += '// BORDER RADIUS\n';
+        variablesScss += '// BOOLEANS\n';
         variablesScss += '// ====================================\n\n';
-        variablesScss += '$radius: (\n';
-        for (var r = 0; r < radiusPrimitives.length; r++) {
-            variablesScss += '        ' + radiusPrimitives[r].key + ': ' + radiusPrimitives[r].value;
-            variablesScss += (r < radiusPrimitives.length - 1) ? ',\n' : '\n';
+        for (var bv = 0; bv < booleanVars.length; bv++) {
+            variablesScss += '$' + booleanVars[bv].key + ': ' + booleanVars[bv].value + ';\n';
         }
-        variablesScss += ');\n';
+        variablesScss += '\n';
+    }
+
+    // Shadows - simple SCSS variables (comma-separated box-shadow lists)
+    if (shadows.length > 0) {
+        variablesScss += '// ====================================\n';
+        variablesScss += '// SHADOWS\n';
+        variablesScss += '// ====================================\n\n';
+        for (var shv = 0; shv < shadows.length; shv++) {
+            variablesScss += '$shadow-' + shadows[shv].name + ': ' + shadows[shv].value + ';\n';
+        }
+        variablesScss += '\n';
     }
 
     // ========================================
@@ -661,31 +1020,28 @@ function generateScssFiles(data, options) {
 
     // Colors - primitives
     if (colorPrimitives.length > 0) {
-        rootScss += '  // Colors\n';
+        rootScss += '  // COLORS\n';
         rootScss += '  @each $key, $val in $colors {\n';
         rootScss += '    --color-#{$key}: #{$val};\n';
         rootScss += '  }\n\n';
     }
 
-    // Spacing - primitives
-    if (spacingPrimitives.length > 0) {
-        rootScss += '  // Spacing\n';
-        rootScss += '  @each $key, $val in $spacing {\n';
-        rootScss += '    --spacing-#{$key}: #{$val};\n';
-        rootScss += '  }\n\n';
-    }
+    // Number primitives - data-driven (breakpoints are skipped: CSS vars can't be used in media queries)
+    for (var rootIdx = 0; rootIdx < numberCategoryOrder.length; rootIdx++) {
+        var rootCat = numberCategoryOrder[rootIdx];
+        var rootMeta = numberCategoryMeta[rootCat];
+        if (!rootMeta.inRoot) continue;
+        if (numberGroups[rootCat].primitives.length === 0) continue;
 
-    // Radius - primitives
-    if (radiusPrimitives.length > 0) {
-        rootScss += '  // Border radius\n';
-        rootScss += '  @each $key, $val in $radius {\n';
-        rootScss += '    --radius-#{$key}: #{$val};\n';
+        rootScss += '  // ' + rootMeta.label + '\n';
+        rootScss += '  @each $key, $val in $' + rootCat + ' {\n';
+        rootScss += '    --' + rootMeta.cssPrefix + '-#{$key}: #{$val};\n';
         rootScss += '  }\n\n';
     }
 
     // Text styles
     if (textStyles.length > 0) {
-        rootScss += '  // Font styles\n';
+        rootScss += '  // FONT STYLES\n';
         for (var tsi = 0; tsi < textStyles.length; tsi++) {
             var style = textStyles[tsi];
             var fontSizeRem = pxToRem(style.fontSize);
@@ -695,8 +1051,25 @@ function generateScssFiles(data, options) {
         rootScss += '\n';
     }
 
+    // Shadows
+    if (shadows.length > 0) {
+        rootScss += '  // SHADOWS\n';
+        for (var shr = 0; shr < shadows.length; shr++) {
+            rootScss += '  --shadow-' + shadows[shr].name + ': ' + shadows[shr].value + ';\n';
+        }
+        rootScss += '\n';
+    }
+
     // Aliases section (semantic tokens)
-    var hasAliases = colorAliases.length > 0 || spacingAliases.length > 0 || radiusAliases.length > 0 || filteredStringsAliases.length > 0;
+    var hasNumberAliases = false;
+    for (var hnaIdx = 0; hnaIdx < numberCategoryOrder.length; hnaIdx++) {
+        var hnaCat = numberCategoryOrder[hnaIdx];
+        if (numberCategoryMeta[hnaCat].inRoot && numberGroups[hnaCat].aliases.length > 0) {
+            hasNumberAliases = true;
+            break;
+        }
+    }
+    var hasAliases = colorAliases.length > 0 || hasNumberAliases || filteredStringsAliases.length > 0;
 
     if (hasAliases) {
         rootScss += '  // ====================================\n';
@@ -705,7 +1078,7 @@ function generateScssFiles(data, options) {
 
         // Color aliases
         if (colorAliases.length > 0) {
-            rootScss += '  // Colors\n';
+            rootScss += '  // COLORS\n';
             for (var ca = 0; ca < colorAliases.length; ca++) {
                 var alias = colorAliases[ca];
                 rootScss += '  --color-' + alias.key + ': var(--color-' + alias.referencedVarName + ');\n';
@@ -713,32 +1086,27 @@ function generateScssFiles(data, options) {
             rootScss += '\n';
         }
 
-        // Spacing aliases
-        if (spacingAliases.length > 0) {
-            rootScss += '  // Spacing\n';
-            for (var sa = 0; sa < spacingAliases.length; sa++) {
-                var alias = spacingAliases[sa];
-                rootScss += '  --spacing-' + alias.key + ': var(--spacing-' + alias.referencedVarName + ');\n';
-            }
-            rootScss += '\n';
-        }
+        // Number aliases - data-driven
+        for (var aliasIdx = 0; aliasIdx < numberCategoryOrder.length; aliasIdx++) {
+            var aliasCat = numberCategoryOrder[aliasIdx];
+            var aliasMeta = numberCategoryMeta[aliasCat];
+            if (!aliasMeta.inRoot) continue;
+            var aliasArr = numberGroups[aliasCat].aliases;
+            if (aliasArr.length === 0) continue;
 
-        // Radius aliases
-        if (radiusAliases.length > 0) {
-            rootScss += '  // Border radius\n';
-            for (var ra = 0; ra < radiusAliases.length; ra++) {
-                var alias = radiusAliases[ra];
-                rootScss += '  --radius-' + alias.key + ': var(--radius-' + alias.referencedVarName + ');\n';
+            rootScss += '  // ' + aliasMeta.label + '\n';
+            for (var na = 0; na < aliasArr.length; na++) {
+                rootScss += '  --' + aliasMeta.cssPrefix + '-' + aliasArr[na].key + ': var(--' + aliasMeta.cssPrefix + '-' + aliasArr[na].referencedVarName + ');\n';
             }
             rootScss += '\n';
         }
 
         // String aliases (excluding font families)
         if (filteredStringsAliases.length > 0) {
-            rootScss += '  // Strings\n';
+            rootScss += '  // STRINGS\n';
             for (var ssa = 0; ssa < filteredStringsAliases.length; ssa++) {
-                var alias = filteredStringsAliases[ssa];
-                rootScss += '  --' + alias.key + ': var(--' + alias.referencedVarName + ');\n';
+                var salias = filteredStringsAliases[ssa];
+                rootScss += '  --' + salias.key + ': var(--' + salias.referencedVarName + ');\n';
             }
             rootScss += '\n';
         }
@@ -746,13 +1114,30 @@ function generateScssFiles(data, options) {
 
     rootScss += '}\n';
 
+    // Mode overrides (themes, brands...) as scoped attribute selectors.
+    // Base values live in :root; each non-default mode overrides only what differs.
+    var modeData = data.modeData || [];
+    for (var md = 0; md < modeData.length; md++) {
+        var axis = modeData[md];
+        for (var mo = 0; mo < axis.modes.length; mo++) {
+            var modeBlock = axis.modes[mo];
+            if (!modeBlock.props || modeBlock.props.length === 0) continue;
+            rootScss += '\n// ' + axis.collectionName + ' — ' + modeBlock.modeName + '\n';
+            rootScss += '[' + axis.attribute + '="' + modeBlock.attrValue + '"] {\n';
+            for (var pp = 0; pp < modeBlock.props.length; pp++) {
+                rootScss += '  ' + modeBlock.props[pp].cssVar + ': ' + modeBlock.props[pp].value + ';\n';
+            }
+            rootScss += '}\n';
+        }
+    }
+
     console.log('_variables.scss generated: ' + variablesScss.length + ' characters');
     console.log('_root.scss generated: ' + rootScss.length + ' characters');
 
     // Combine all for backward compatibility (using filtered strings)
     var allColorMap = colorPrimitives.concat(colorAliases);
-    var allSpacingMap = spacingPrimitives.concat(spacingAliases);
-    var allRadiusMap = radiusPrimitives.concat(radiusAliases);
+    var allSpacingMap = numberGroups['spacing'].primitives.concat(numberGroups['spacing'].aliases);
+    var allRadiusMap = numberGroups['radius'].primitives.concat(numberGroups['radius'].aliases);
     var allStringsVars = filteredStringsPrimitives.concat(filteredStringsAliases);
 
     return {
@@ -854,6 +1239,136 @@ function generateThemeJson(scssData) {
     return jsonString;
 }
 
+// Split a Figma variable name into DTCG path segments.
+// DTCG forbids '.', '{', '}' and '$' in names; '/' is the Figma group separator.
+function dtcgPathSegments(figmaName) {
+    return figmaName.split('/').map(function(seg) {
+        return seg.trim().replace(/\./g, ' ').replace(/[{}$]/g, '');
+    });
+}
+
+// Place a token object at the right nested path in the tree.
+function setTokenAtPath(root, segments, token) {
+    var node = root;
+    for (var i = 0; i < segments.length - 1; i++) {
+        var seg = segments[i];
+        if (!node[seg] || typeof node[seg] !== 'object' || node[seg].$value !== undefined) {
+            node[seg] = {};
+        }
+        node = node[seg];
+    }
+    node[segments[segments.length - 1]] = token;
+}
+
+// Convert a Figma lineHeight ({value, unit}) to a DTCG value.
+// AUTO -> omitted; PERCENT -> unitless ratio; PIXELS -> px dimension.
+function dtcgLineHeight(lh) {
+    if (!lh || typeof lh !== 'object') return null;
+    if (lh.unit === 'AUTO') return null;
+    if (lh.unit === 'PERCENT') return Math.round((lh.value / 100) * 1000) / 1000;
+    return lh.value + 'px';
+}
+
+// Convert a Figma letterSpacing ({value, unit}) to a DTCG dimension (px).
+// PERCENT is resolved against the font size so the output stays in px.
+function dtcgLetterSpacing(ls, fontSize) {
+    if (!ls || typeof ls !== 'object') return null;
+    if (ls.value === 0) return '0px';
+    if (ls.unit === 'PERCENT') return Math.round((ls.value / 100) * fontSize * 1000) / 1000 + 'px';
+    return ls.value + 'px';
+}
+
+// Generate a W3C Design Tokens (DTCG) tokens.json from the extracted variables.
+// Aliases are preserved as references (e.g. "{color.green.500}") rather than resolved,
+// so the file stays a true source format. Values keep their raw Figma units (px).
+function generateDtcgTokens(data) {
+    var variables = data.variables;
+    var root = {};
+
+    function addToken(figmaName, type, value, isAlias, refOriginalName) {
+        var token = {};
+        if (type) token['$type'] = type;
+        if (isAlias && refOriginalName) {
+            token['$value'] = '{' + dtcgPathSegments(refOriginalName).join('.') + '}';
+        } else {
+            token['$value'] = value;
+        }
+        setTokenAtPath(root, dtcgPathSegments(figmaName), token);
+    }
+
+    // Colors
+    for (var i = 0; i < variables.colors.length; i++) {
+        var c = variables.colors[i];
+        var hex = (c.value && typeof c.value === 'object' && 'r' in c.value) ? rgbaToHex(c.value) : c.value;
+        addToken(c.name, 'color', hex, c.isAlias, c.referencedVarOriginalName);
+    }
+
+    // Numbers
+    for (var j = 0; j < variables.numbers.length; j++) {
+        var num = variables.numbers[j];
+        var isRef = num.isAlias && num.referencedVarOriginalName;
+        // Literals need a valid number; references carry no value (emitted as "{...}").
+        if (!isRef && (typeof num.value !== 'number' || isNaN(num.value))) continue;
+        var cat = classifyNumber(num.name);
+        var type, val;
+        if (cat === 'opacity' || cat === 'line-height' || cat === 'z-index') {
+            type = 'number';
+            val = isRef ? null : num.value;
+        } else if (cat === 'font-weight') {
+            type = 'fontWeight';
+            val = isRef ? null : Math.round(num.value);
+        } else {
+            type = 'dimension';
+            val = isRef ? null : (num.value + 'px'); // raw px source value; consumers convert to rem if needed
+        }
+        addToken(num.name, type, val, num.isAlias, num.referencedVarOriginalName);
+    }
+
+    // Strings (font families get the proper DTCG type; others stay typeless)
+    for (var k = 0; k < variables.strings.length; k++) {
+        var s = variables.strings[k];
+        var lower = s.name.toLowerCase();
+        var isFont = lower.indexOf('font') !== -1 || lower.indexOf('family') !== -1 || lower.indexOf('typeface') !== -1;
+        addToken(s.name, isFont ? 'fontFamily' : null, s.value, s.isAlias, s.referencedVarOriginalName);
+    }
+
+    // Booleans (no standard DTCG type; emitted as raw boolean values)
+    for (var b = 0; b < variables.booleans.length; b++) {
+        var bo = variables.booleans[b];
+        addToken(bo.name, null, bo.value, bo.isAlias, bo.referencedVarOriginalName);
+    }
+
+    // Typography (text styles -> DTCG typography composite)
+    var textStyles = data.textStyles || [];
+    for (var t = 0; t < textStyles.length; t++) {
+        var ts = textStyles[t];
+        var typographyValue = {
+            fontFamily: ts.fontFamily,
+            fontSize: ts.fontSize + 'px',
+            fontWeight: parseInt(ts.fontWeightValue, 10)
+        };
+        var lh = dtcgLineHeight(ts.lineHeight);
+        if (lh !== null) typographyValue.lineHeight = lh;
+        var ls = dtcgLetterSpacing(ts.letterSpacing, ts.fontSize);
+        if (ls !== null) typographyValue.letterSpacing = ls;
+
+        setTokenAtPath(root, dtcgPathSegments(ts.name), { '$type': 'typography', '$value': typographyValue });
+    }
+
+    // Shadows (effect styles -> DTCG shadow composite)
+    var shadows = data.shadows || [];
+    for (var sh = 0; sh < shadows.length; sh++) {
+        var shadow = shadows[sh];
+        if (!shadow.layers || shadow.layers.length === 0) continue;
+        var shadowValue = shadow.layers.length === 1 ? shadow.layers[0] : shadow.layers;
+        setTokenAtPath(root, dtcgPathSegments(shadow.originalName || shadow.name), { '$type': 'shadow', '$value': shadowValue });
+    }
+
+    var jsonString = JSON.stringify(root, null, 2);
+    console.log('tokens.json (DTCG) generated: ' + jsonString.length + ' characters');
+    return jsonString;
+}
+
 // Listen to messages from UI
 figma.ui.onmessage = async function(msg) {
     console.log('Message received:', msg);
@@ -864,27 +1379,41 @@ figma.ui.onmessage = async function(msg) {
         return;
     }
 
+    if (msg.type === 'notify') {
+        // Native Figma toast (shown at the bottom of the canvas)
+        figma.notify(msg.message || '');
+        return;
+    }
+
     if (msg.type === 'generate') {
         try {
             console.log('Starting generation');
             figma.notify('🔄 Extracting variables...', { timeout: 2000 });
 
             var data = await extractVariables(msg.options.onlyUsed, msg.options.selectedCollections);
-            var scssFiles = generateScssFiles(data, msg.options);
+
+            // Determine requested output formats (default: SCSS, for backward compatibility)
+            var formats = msg.options.formats || { scss: true, dtcg: false };
 
             console.log('Sending files to UI');
 
-            // Build files array
-            var files = [
-                {
-                    filename: '_variables.scss',
-                    content: scssFiles.variables
-                },
-                {
-                    filename: '_root.scss',
-                    content: scssFiles.root
-                }
-            ];
+            // Build files array based on selected formats
+            var files = [];
+
+            if (formats.scss) {
+                var scssFiles = generateScssFiles(data, msg.options);
+                files.push({ filename: '_variables.scss', content: scssFiles.variables });
+                files.push({ filename: '_root.scss', content: scssFiles.root });
+            }
+
+            if (formats.dtcg) {
+                files.push({ filename: 'tokens.json', content: generateDtcgTokens(data) });
+            }
+
+            if (files.length === 0) {
+                figma.notify('⚠️ Select at least one output format', { error: true });
+                return;
+            }
 
             // Send files to UI for download
             figma.ui.postMessage({
@@ -921,6 +1450,39 @@ figma.ui.onmessage = async function(msg) {
 
         } catch (error) {
             console.error('Error:', error);
+            figma.notify('❌ Error: ' + error.message, { error: true });
+        }
+    }
+
+    if (msg.type === 'preview') {
+        // Build the full set of export files (both SCSS and DTCG) and send them to
+        // the UI so it can list them, copy their contents, and download each one
+        // independently — without triggering any download here.
+        try {
+            var previewData = await extractVariables(msg.options.onlyUsed, msg.options.selectedCollections);
+
+            var previewFiles = [];
+            var previewScss = generateScssFiles(previewData, msg.options);
+            previewFiles.push({ filename: '_variables.scss', content: previewScss.variables });
+            previewFiles.push({ filename: '_root.scss', content: previewScss.root });
+            previewFiles.push({ filename: 'tokens.json', content: generateDtcgTokens(previewData) });
+
+            figma.ui.postMessage({
+                type: 'preview-files',
+                files: previewFiles,
+                stats: {
+                    total: previewData.totalVariables,
+                    exported: previewData.exportedVariables,
+                    skipped: previewData.skippedVariables,
+                    collections: previewData.collections.length,
+                    colors: previewData.variables.colors.length,
+                    numbers: previewData.variables.numbers.length,
+                    strings: previewData.variables.strings.length,
+                    booleans: previewData.variables.booleans.length
+                }
+            });
+        } catch (error) {
+            console.error('Error building preview:', error);
             figma.notify('❌ Error: ' + error.message, { error: true });
         }
     }

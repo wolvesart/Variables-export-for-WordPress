@@ -39,6 +39,31 @@ function buildJS() {
     }
 }
 
+// Read the bundled font and inline it as a base64 @font-face, so the UI needs no
+// network access to Google Fonts — the plugin then works fully offline.
+function buildFontFace() {
+    const fontFile = path.join(srcDir, 'fonts', 'CascadiaCode.woff2');
+    if (!fs.existsSync(fontFile)) {
+        console.warn('⚠️  Font not found (src/fonts/CascadiaCode.woff2) — skipping @font-face embedding');
+        return '';
+    }
+    const base64 = fs.readFileSync(fontFile).toString('base64');
+    return "@font-face{font-family:'Cascadia Code';font-style:normal;font-weight:200 700;"
+        + "font-display:swap;src:url(data:font/woff2;base64," + base64 + ") format('woff2');}\n";
+}
+
+// Read vendored third-party library (jszip) to inline it instead of loading from a CDN.
+// This keeps ui.html self-contained and lets the export work fully offline.
+function buildVendorJS() {
+    const jszipFile = path.join(__dirname, 'node_modules', 'jszip', 'dist', 'jszip.min.js');
+    if (fs.existsSync(jszipFile)) {
+        return fs.readFileSync(jszipFile, 'utf8');
+    } else {
+        console.error('Error: jszip not found. Run `npm install` first.');
+        process.exit(1);
+    }
+}
+
 // Main build function
 function build() {
     console.log('Building ui.html...');
@@ -52,13 +77,15 @@ function build() {
 
     let html = fs.readFileSync(templatePath, 'utf8');
 
-    // Build CSS and JS
-    const css = buildCSS();
+    // Build CSS and JS (prefix the CSS with the inlined @font-face)
+    const css = buildFontFace() + buildCSS();
     const js = buildJS();
+    const vendorJs = buildVendorJS();
 
     // Replace placeholders
-    html = html.replace('/* BUILD_CSS_PLACEHOLDER */', css);
-    html = html.replace('/* BUILD_JS_PLACEHOLDER */', js);
+    html = html.replace('/* BUILD_CSS_PLACEHOLDER */', () => css);
+    html = html.replace('/* BUILD_VENDOR_JS_PLACEHOLDER */', () => vendorJs);
+    html = html.replace('/* BUILD_JS_PLACEHOLDER */', () => js);
 
     // Write output
     fs.writeFileSync(outputFile, html, 'utf8');
