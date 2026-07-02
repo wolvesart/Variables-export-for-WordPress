@@ -1,0 +1,46 @@
+// ==========================================
+// Shared mixins
+// ==========================================
+
+// Icône monochrome dessinée via un masque SVG.
+// Le plugin tourne dans un Chromium récent : `mask` non préfixé suffit.
+@mixin mask-icon($svg, $size: contain, $color: currentColor) {
+  background: $color;
+  mask: url($svg) no-repeat center;
+  mask-size: $size;
+}
+
+// Rangée bordée haut/bas (options d'export, mapping, liste de fichiers)
+@mixin bordered-row($gap: var(--spacing-16)) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+  padding: var(--spacing-16) 0;
+  border-top: 1px solid var(--color-green-500);
+  border-bottom: 1px solid var(--color-green-500);
+
+  // Collapse doubled borders between consecutive rows
+  & + & {
+    margin-top: -1px;
+  }
+}
+
+// Variante colorée de bouton : fond + encoches décoratives (::before / ::after)
+@mixin btn-variant($bg, $color, $bg-hover: null) {
+  background: $bg;
+  color: $color;
+
+  &::before, &::after {
+    background: $bg;
+  }
+
+  @if $bg-hover {
+    &:hover {
+      background: $bg-hover;
+
+      &::before, &::after {
+        background: $bg-hover;
+      }
+    }
+  }
+}

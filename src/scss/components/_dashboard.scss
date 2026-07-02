@@ -1,3 +1,5 @@
+@use '../mixins' as *;
+
 .dashboard {
   padding: 16px;
   display: flex;
@@ -75,10 +77,7 @@
           .dot {
             width: 8px;
             height: 8px;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M8 2H10V8H8V10H2V8H0V2H2V0H8V2Z' fill='currentcolor'/%3E%3C/svg%3E");
-            mask-repeat: no-repeat;
-            mask-size: contain;
-            mask-position: center;
+            @include mask-icon("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M8 2H10V8H8V10H2V8H0V2H2V0H8V2Z' fill='currentcolor'/%3E%3C/svg%3E");
 
             &.used {
               background: var(--color-purple-500);

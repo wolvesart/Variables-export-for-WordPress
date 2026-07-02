@@ -335,7 +335,8 @@ document.getElementById('cancel').onclick = () => {
 
 // Populate mapping dropdowns with variable groups
 function populateMappingDropdowns(variableGroups) {
-    const selects = document.querySelectorAll('.mapping-select');
+    // Single-variable dropdowns ([data-variable-select]) are populated separately
+    const selects = document.querySelectorAll('.mapping-select:not([data-variable-select])');
 
     // Keywords for auto-matching groups to mappings
     const matchPatterns = {
@@ -343,7 +344,8 @@ function populateMappingDropdowns(variableGroups) {
         'map-fontFamilies': ['family', 'families', 'font-family', 'typeface', 'police'],
         'map-fontSizes': ['size', 'font-size', 'text-size', 'taille'],
         'map-spacing': ['spacing', 'space', 'gap', 'margin', 'padding', 'espacement'],
-        'map-radius': ['radius', 'corner', 'round', 'border-radius', 'rayon']
+        'map-radius': ['radius', 'corner', 'round', 'border-radius', 'rayon'],
+        'map-borderWidth': ['border-width', 'borderwidth', 'stroke']
     };
 
     selects.forEach(select => {
@@ -359,7 +361,8 @@ function populateMappingDropdowns(variableGroups) {
             filteredGroups = variableGroups.filter(g => g.types.includes('COLOR'));
         } else if (selectId === 'map-fontFamilies') {
             filteredGroups = variableGroups.filter(g => g.types.includes('STRING'));
-        } else if (selectId === 'map-fontSizes' || selectId === 'map-spacing' || selectId === 'map-radius') {
+        } else {
+            // All other mappings (font sizes, spacing, radius, custom categories) are numeric
             filteredGroups = variableGroups.filter(g => g.types.includes('FLOAT'));
         }
 
@@ -390,6 +393,63 @@ function populateMappingDropdowns(variableGroups) {
     });
 }
 
+// Populate single-variable dropdowns (layout sizes) with individual variables.
+// Options are grouped by "Collection / group" and show the resolved value so
+// the user can verify the mapping without going back to the Figma variables panel.
+function populateVariableDropdowns(variableOptions) {
+    const selects = document.querySelectorAll('.mapping-select[data-variable-select]');
+
+    // Keywords for auto-matching a variable to each mapping
+    const matchPatterns = {
+        'map-contentSize': ['content', 'container'],
+        'map-wideSize': ['wide', 'full']
+    };
+
+    // Group variables by "Collection / group" for <optgroup> rendering
+    const groups = new Map();
+    variableOptions.forEach(v => {
+        const groupLabel = v.collectionName + ' / ' + v.groupName;
+        if (!groups.has(groupLabel)) groups.set(groupLabel, []);
+        groups.get(groupLabel).push(v);
+    });
+
+    selects.forEach(select => {
+        select.innerHTML = '<option value="">-- Select --</option>';
+        const patterns = matchPatterns[select.id] || [];
+        let bestMatch = null;
+
+        groups.forEach((vars, groupLabel) => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = groupLabel;
+
+            vars.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v.id;
+                // Show the name without its group prefix, plus the resolved value
+                const shortName = v.name.includes('/') ? v.name.split('/').slice(1).join('/').trim() : v.name;
+                option.textContent = shortName + ' · ' + v.value;
+                optgroup.appendChild(option);
+
+                if (!bestMatch) {
+                    const nameLower = v.name.toLowerCase();
+                    for (const pattern of patterns) {
+                        if (nameLower.includes(pattern)) {
+                            bestMatch = v.id;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            select.appendChild(optgroup);
+        });
+
+        if (bestMatch) {
+            select.value = bestMatch;
+        }
+    });
+}
+
 // Get current mappings
 function getMappings() {
     return {
@@ -397,7 +457,11 @@ function getMappings() {
         fontFamilies: document.getElementById('map-fontFamilies').value,
         fontSizes: document.getElementById('map-fontSizes').value,
         spacing: document.getElementById('map-spacing').value,
-        radius: document.getElementById('map-radius').value
+        contentSize: document.getElementById('map-contentSize').value,
+        wideSize: document.getElementById('map-wideSize').value,
+        radius: document.getElementById('map-radius').value,
+        borderWidth: document.getElementById('map-borderWidth').value,
+        shadows: document.getElementById('map-shadows').checked
     };
 }
 
@@ -449,6 +513,11 @@ window.onmessage = async (event) => {
         // Populate mapping dropdowns with variable groups for theme.json tab
         if (msg.variableGroups) {
             populateMappingDropdowns(msg.variableGroups);
+        }
+
+        // Populate single-variable dropdowns (layout sizes)
+        if (msg.variableOptions) {
+            populateVariableDropdowns(msg.variableOptions);
         }
 
         // Build the initial export preview (file lists) in the background.

@@ -1,13 +1,15 @@
-@import "variables";
+@use "variables" as *;
 
-:root, body {
+:root {
   // ====================================
   // PRIMITIVES
   // ====================================
 
   // Colors
+  // ("" + $key) : force la clé en chaîne, certaines clés générées
+  // (blue, orange…) étant sinon parsées comme des couleurs CSS
   @each $key, $val in $colors {
-    --color-#{$key}: #{$val};
+    --color-#{"" + $key}: #{$val};
   }
 
   // Spacing

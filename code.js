@@ -90,6 +90,38 @@ async function sendInitialStats() {
             });
         }
 
+        // Individual dimensional variables, with their resolved value, for
+        // single-variable mappings (layout contentSize / wideSize). Only the
+        // plausible categories are listed to keep the dropdowns short.
+        var variableOptions = [];
+        for (var vo = 0; vo < localVariables.length; vo++) {
+            var voVar = localVariables[vo];
+            if (voVar.resolvedType !== 'FLOAT') continue;
+            var voCat = classifyNumber(voVar.name);
+            if (voCat !== 'sizing' && voCat !== 'spacing' && voCat !== 'breakpoints') continue;
+            var voModeIds = Object.keys(voVar.valuesByMode);
+            var voValue = await resolveAliasValue(voVar.valuesByMode[voModeIds[0]], 'FLOAT');
+            if (typeof voValue !== 'number' || isNaN(voValue)) continue;
+
+            var voCollectionName = '';
+            for (var voc = 0; voc < collections.length; voc++) {
+                if (collections[voc].id === voVar.variableCollectionId) {
+                    voCollectionName = collections[voc].name;
+                    break;
+                }
+            }
+
+            variableOptions.push({
+                id: voVar.id,
+                name: voVar.name,
+                collectionName: voCollectionName,
+                groupName: voVar.name.split('/')[0].trim(),
+                // Raw Figma value (px), as authored in the variables panel —
+                // conversion to rem only happens at export time
+                value: voValue + 'px'
+            });
+        }
+
         // 1) Send the lightweight stats right away so the UI renders immediately,
         //    without waiting for the expensive whole-document usage analysis.
         figma.ui.postMessage({
@@ -103,7 +135,8 @@ async function sendInitialStats() {
                 booleans: booleans
             },
             collections: collectionsArray,
-            variableGroups: variableGroups
+            variableGroups: variableGroups,
+            variableOptions: variableOptions
         });
 
         // 2) Compute variable usage in the background, then send a follow-up
@@ -1010,8 +1043,8 @@ function generateScssFiles(data, options) {
     // ========================================
     // Generate _root.scss (CSS Custom Properties)
     // ========================================
-    var rootScss = '@import "variables";\n\n';
-    rootScss += ':root, body {\n';
+    var rootScss = '@use "variables" as *;\n\n';
+    rootScss += ':root {\n';
 
     // Primitives section
     rootScss += '  // ====================================\n';
@@ -1021,8 +1054,10 @@ function generateScssFiles(data, options) {
     // Colors - primitives
     if (colorPrimitives.length > 0) {
         rootScss += '  // COLORS\n';
+        rootScss += '  // ("" + $key) forces the key to a string: some keys (blue, orange...)\n';
+        rootScss += '  // would otherwise be parsed by Sass as CSS colors and trigger warnings\n';
         rootScss += '  @each $key, $val in $colors {\n';
-        rootScss += '    --color-#{$key}: #{$val};\n';
+        rootScss += '    --color-#{"" + $key}: #{$val};\n';
         rootScss += '  }\n\n';
     }
 
@@ -1035,7 +1070,7 @@ function generateScssFiles(data, options) {
 
         rootScss += '  // ' + rootMeta.label + '\n';
         rootScss += '  @each $key, $val in $' + rootCat + ' {\n';
-        rootScss += '    --' + rootMeta.cssPrefix + '-#{$key}: #{$val};\n';
+        rootScss += '    --' + rootMeta.cssPrefix + '-#{"" + $key}: #{$val};\n';
         rootScss += '  }\n\n';
     }
 
@@ -1134,109 +1169,10 @@ function generateScssFiles(data, options) {
     console.log('_variables.scss generated: ' + variablesScss.length + ' characters');
     console.log('_root.scss generated: ' + rootScss.length + ' characters');
 
-    // Combine all for backward compatibility (using filtered strings)
-    var allColorMap = colorPrimitives.concat(colorAliases);
-    var allSpacingMap = numberGroups['spacing'].primitives.concat(numberGroups['spacing'].aliases);
-    var allRadiusMap = numberGroups['radius'].primitives.concat(numberGroups['radius'].aliases);
-    var allStringsVars = filteredStringsPrimitives.concat(filteredStringsAliases);
-
     return {
         variables: variablesScss,
-        root: rootScss,
-        colorMap: allColorMap,
-        spacingMap: allSpacingMap,
-        radiusMap: allRadiusMap,
-        stringsVars: allStringsVars
+        root: rootScss
     };
-}
-
-// Generate WordPress theme.json content
-function generateThemeJson(scssData) {
-    console.log('Generating theme.json...');
-
-    var colorMap = scssData.colorMap;
-    var spacingMap = scssData.spacingMap;
-    var radiusMap = scssData.radiusMap;
-    var stringsVars = scssData.stringsVars;
-
-    // Build color palette
-    var colorPalette = [];
-    for (var i = 0; i < colorMap.length; i++) {
-        var color = colorMap[i];
-        colorPalette.push({
-            slug: color.key,
-            color: color.value,
-            name: color.key.charAt(0).toUpperCase() + color.key.slice(1).replace(/-/g, ' ')
-        });
-    }
-
-    // Build font families from string variables
-    var fontFamilies = [];
-    for (var f = 0; f < stringsVars.length; f++) {
-        var strVar = stringsVars[f];
-        var lowerKey = strVar.key.toLowerCase();
-        if (lowerKey.indexOf('font') !== -1 || lowerKey.indexOf('family') !== -1 || lowerKey.indexOf('typeface') !== -1) {
-            var fontValue = strVar.value.replace(/^["']|["']$/g, '');
-            fontFamilies.push({
-                fontFamily: fontValue,
-                slug: strVar.key,
-                name: strVar.key.charAt(0).toUpperCase() + strVar.key.slice(1).replace(/-/g, ' ')
-            });
-        }
-    }
-
-    // Build spacing sizes
-    var spacingSizes = [];
-    for (var j = 0; j < spacingMap.length; j++) {
-        var spacing = spacingMap[j];
-        spacingSizes.push({
-            slug: String(spacing.key),
-            size: spacing.value,
-            name: spacing.key + 'px'
-        });
-    }
-
-    // Build custom spacing object
-    var customSpacing = {};
-    for (var k = 0; k < spacingMap.length; k++) {
-        customSpacing[spacingMap[k].key] = spacingMap[k].value;
-    }
-
-    // Build custom radius object
-    var customRadius = {};
-    for (var r = 0; r < radiusMap.length; r++) {
-        customRadius[radiusMap[r].key] = radiusMap[r].value;
-    }
-
-    // Build theme.json structure
-    var themeJson = {
-        "$schema": "https://schemas.wp.org/trunk/theme.json",
-        "version": 2,
-        "settings": {
-            "color": {
-                "palette": colorPalette
-            },
-            "spacing": {
-                "spacingSizes": spacingSizes
-            },
-            "custom": {
-                "spacing": customSpacing,
-                "radius": customRadius
-            }
-        }
-    };
-
-    // Add typography if font families were found
-    if (fontFamilies.length > 0) {
-        themeJson.settings.typography = {
-            fontFamilies: fontFamilies
-        };
-    }
-
-    var jsonString = JSON.stringify(themeJson, null, 2);
-    console.log('theme.json generated: ' + jsonString.length + ' characters');
-
-    return jsonString;
 }
 
 // Split a Figma variable name into DTCG path segments.
@@ -1528,124 +1464,154 @@ figma.ui.onmessage = async function(msg) {
                 return usedVariableIds.has(variable.id);
             }
 
-            // Build theme.json structure
+            // Resolve a mapped group into [{variable, value}] pairs
+            async function collectGroup(groupId, type) {
+                var collected = [];
+                if (!groupId) return collected;
+                for (var gi = 0; gi < localVariables.length; gi++) {
+                    var gVar = localVariables[gi];
+                    if (!variableMatchesGroup(gVar, groupId) || gVar.resolvedType !== type || !shouldIncludeVariable(gVar)) continue;
+                    var gModeIds = Object.keys(gVar.valuesByMode);
+                    var gValue = await resolveAliasValue(gVar.valuesByMode[gModeIds[0]], type);
+                    collected.push({ variable: gVar, value: gValue });
+                }
+                return collected;
+            }
+
+            function humanizeSlug(slug) {
+                return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ');
+            }
+
+            // Build theme.json structure (schema v3 — WordPress 6.6+)
             var themeJson = {
                 "$schema": "https://schemas.wp.org/trunk/theme.json",
-                "version": 2,
+                "version": 3,
                 "settings": {}
             };
 
-            // Process colors
-            if (mappings.colors) {
-                var colorPalette = [];
-                for (var i = 0; i < localVariables.length; i++) {
-                    var variable = localVariables[i];
-                    if (variableMatchesGroup(variable, mappings.colors) && variable.resolvedType === 'COLOR' && shouldIncludeVariable(variable)) {
-                        var modeIds = Object.keys(variable.valuesByMode);
-                        var value = await resolveAliasValue(variable.valuesByMode[modeIds[0]], 'COLOR');
-                        if (value && typeof value === 'object' && 'r' in value) {
-                            var name = removeTypePrefix(normalizeVariableName(variable.name), 'color');
-                            colorPalette.push({
-                                slug: name,
-                                color: rgbaToHex(value),
-                                name: name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' ')
-                            });
-                        }
-                    }
-                }
-                if (colorPalette.length > 0) {
-                    themeJson.settings.color = { palette: colorPalette };
+            // Colors -> settings.color.palette (--wp--preset--color-<slug>)
+            var colorVars = await collectGroup(mappings.colors, 'COLOR');
+            var colorPalette = [];
+            for (var i = 0; i < colorVars.length; i++) {
+                var colorValue = colorVars[i].value;
+                if (colorValue && typeof colorValue === 'object' && 'r' in colorValue) {
+                    var colorName = removeTypePrefix(normalizeVariableName(colorVars[i].variable.name), 'color');
+                    colorPalette.push({
+                        slug: colorName,
+                        color: rgbaToHex(colorValue),
+                        name: humanizeSlug(colorName)
+                    });
                 }
             }
-
-            // Process font families
-            if (mappings.fontFamilies) {
-                var fontFamilies = [];
-                for (var j = 0; j < localVariables.length; j++) {
-                    var variable = localVariables[j];
-                    if (variableMatchesGroup(variable, mappings.fontFamilies) && variable.resolvedType === 'STRING' && shouldIncludeVariable(variable)) {
-                        var modeIds = Object.keys(variable.valuesByMode);
-                        var value = await resolveAliasValue(variable.valuesByMode[modeIds[0]], 'STRING');
-                        if (value) {
-                            var name = removeTypePrefix(normalizeVariableName(variable.name), 'font');
-                            fontFamilies.push({
-                                fontFamily: value,
-                                slug: name,
-                                name: name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' ')
-                            });
-                        }
-                    }
-                }
-                if (fontFamilies.length > 0) {
-                    if (!themeJson.settings.typography) themeJson.settings.typography = {};
-                    themeJson.settings.typography.fontFamilies = fontFamilies;
-                }
+            if (colorPalette.length > 0) {
+                themeJson.settings.color = { palette: colorPalette };
             }
 
-            // Process font sizes
-            if (mappings.fontSizes) {
-                var fontSizes = [];
-                for (var k = 0; k < localVariables.length; k++) {
-                    var variable = localVariables[k];
-                    if (variableMatchesGroup(variable, mappings.fontSizes) && variable.resolvedType === 'FLOAT' && shouldIncludeVariable(variable)) {
-                        var modeIds = Object.keys(variable.valuesByMode);
-                        var value = await resolveAliasValue(variable.valuesByMode[modeIds[0]], 'FLOAT');
-                        if (typeof value === 'number' && !isNaN(value)) {
-                            var name = removeTypePrefix(normalizeVariableName(variable.name), 'size');
-                            fontSizes.push({
-                                slug: name,
-                                size: pxToRem(value),
-                                name: name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' ')
-                            });
-                        }
-                    }
-                }
-                if (fontSizes.length > 0) {
-                    if (!themeJson.settings.typography) themeJson.settings.typography = {};
-                    themeJson.settings.typography.fontSizes = fontSizes;
-                }
+            // Font families -> settings.typography.fontFamilies
+            var familyVars = await collectGroup(mappings.fontFamilies, 'STRING');
+            var fontFamilies = [];
+            for (var j = 0; j < familyVars.length; j++) {
+                if (!familyVars[j].value) continue;
+                var familyName = removeTypePrefix(normalizeVariableName(familyVars[j].variable.name), 'font');
+                fontFamilies.push({
+                    fontFamily: familyVars[j].value,
+                    slug: familyName,
+                    name: humanizeSlug(familyName)
+                });
+            }
+            if (fontFamilies.length > 0) {
+                if (!themeJson.settings.typography) themeJson.settings.typography = {};
+                themeJson.settings.typography.fontFamilies = fontFamilies;
             }
 
-            // Process spacing
-            if (mappings.spacing) {
-                var spacingSizes = [];
-                for (var l = 0; l < localVariables.length; l++) {
-                    var variable = localVariables[l];
-                    if (variableMatchesGroup(variable, mappings.spacing) && variable.resolvedType === 'FLOAT' && shouldIncludeVariable(variable)) {
-                        var modeIds = Object.keys(variable.valuesByMode);
-                        var value = await resolveAliasValue(variable.valuesByMode[modeIds[0]], 'FLOAT');
-                        if (typeof value === 'number' && !isNaN(value)) {
-                            var name = removeTypePrefix(normalizeVariableName(variable.name), 'spacing');
-                            spacingSizes.push({
-                                slug: name,
-                                size: pxToRem(value),
-                                name: Math.round(value) + 'px'
-                            });
-                        }
-                    }
-                }
-                if (spacingSizes.length > 0) {
-                    themeJson.settings.spacing = { spacingSizes: spacingSizes };
-                }
+            // Font sizes -> settings.typography.fontSizes (--wp--preset--font-size-<slug>)
+            var sizeVars = await collectGroup(mappings.fontSizes, 'FLOAT');
+            var fontSizes = [];
+            for (var k = 0; k < sizeVars.length; k++) {
+                if (typeof sizeVars[k].value !== 'number' || isNaN(sizeVars[k].value)) continue;
+                var sizeName = removeTypePrefix(normalizeVariableName(sizeVars[k].variable.name), 'size');
+                fontSizes.push({
+                    slug: sizeName,
+                    size: pxToRem(sizeVars[k].value),
+                    name: humanizeSlug(sizeName)
+                });
+            }
+            if (fontSizes.length > 0) {
+                if (!themeJson.settings.typography) themeJson.settings.typography = {};
+                themeJson.settings.typography.fontSizes = fontSizes;
+                // Replace the WordPress default presets with the Figma tokens
+                themeJson.settings.typography.defaultFontSizes = false;
             }
 
-            // Process radius
-            if (mappings.radius) {
-                var customRadius = {};
-                for (var m = 0; m < localVariables.length; m++) {
-                    var variable = localVariables[m];
-                    if (variableMatchesGroup(variable, mappings.radius) && variable.resolvedType === 'FLOAT' && shouldIncludeVariable(variable)) {
-                        var modeIds = Object.keys(variable.valuesByMode);
-                        var value = await resolveAliasValue(variable.valuesByMode[modeIds[0]], 'FLOAT');
-                        if (typeof value === 'number' && !isNaN(value)) {
-                            var name = removeTypePrefix(normalizeVariableName(variable.name), 'radius');
-                            customRadius[name] = pxToRem(value);
-                        }
-                    }
+            // Spacing -> settings.spacing.spacingSizes (--wp--preset--spacing-<slug>)
+            var spacingVars = await collectGroup(mappings.spacing, 'FLOAT');
+            var spacingSizes = [];
+            for (var l = 0; l < spacingVars.length; l++) {
+                if (typeof spacingVars[l].value !== 'number' || isNaN(spacingVars[l].value)) continue;
+                var spacingName = removeTypePrefix(normalizeVariableName(spacingVars[l].variable.name), 'spacing');
+                spacingSizes.push({
+                    slug: spacingName,
+                    size: pxToRem(spacingVars[l].value),
+                    name: Math.round(spacingVars[l].value) + 'px'
+                });
+            }
+            if (spacingSizes.length > 0) {
+                // defaultSpacingSizes:false replaces the WordPress default scale
+                themeJson.settings.spacing = { spacingSizes: spacingSizes, defaultSpacingSizes: false };
+            }
+
+            // Numeric groups -> settings.custom.* (--wp--custom--<key>--<slug>)
+            var customCategories = [
+                { mappingKey: 'radius', category: 'radius', customKey: 'radius' },
+                { mappingKey: 'borderWidth', category: 'border-width', customKey: 'borderWidth' }
+            ];
+            for (var cc = 0; cc < customCategories.length; cc++) {
+                var catDef = customCategories[cc];
+                var catVars = await collectGroup(mappings[catDef.mappingKey], 'FLOAT');
+                var customValues = {};
+                for (var cv = 0; cv < catVars.length; cv++) {
+                    if (typeof catVars[cv].value !== 'number' || isNaN(catVars[cv].value)) continue;
+                    var customName = removeTypePrefix(normalizeVariableName(catVars[cv].variable.name), NUMBER_CSS_PREFIX[catDef.category]);
+                    customValues[customName] = formatNumberValue(catDef.category, catVars[cv].value);
                 }
-                if (Object.keys(customRadius).length > 0) {
+                if (Object.keys(customValues).length > 0) {
                     if (!themeJson.settings.custom) themeJson.settings.custom = {};
-                    themeJson.settings.custom.radius = customRadius;
+                    themeJson.settings.custom[catDef.customKey] = customValues;
+                }
+            }
+
+            // Single-variable mappings -> settings.layout (contentSize / wideSize).
+            // The user picked these variables explicitly, so the onlyUsed filter
+            // does not apply here.
+            var layoutTargets = [
+                { mappingKey: 'contentSize', layoutKey: 'contentSize' },
+                { mappingKey: 'wideSize', layoutKey: 'wideSize' }
+            ];
+            for (var lt = 0; lt < layoutTargets.length; lt++) {
+                var layoutVarId = mappings[layoutTargets[lt].mappingKey];
+                if (!layoutVarId) continue;
+                var layoutVar = await getVariableByIdCached(layoutVarId);
+                if (!layoutVar || layoutVar.resolvedType !== 'FLOAT') continue;
+                var lModeIds = Object.keys(layoutVar.valuesByMode);
+                var lValue = await resolveAliasValue(layoutVar.valuesByMode[lModeIds[0]], 'FLOAT');
+                if (typeof lValue !== 'number' || isNaN(lValue)) continue;
+                if (!themeJson.settings.layout) themeJson.settings.layout = {};
+                themeJson.settings.layout[layoutTargets[lt].layoutKey] = pxToRem(lValue);
+            }
+
+            // Effect styles -> settings.shadow.presets (--wp--preset--shadow-<slug>)
+            if (mappings.shadows) {
+                var effectShadows = await extractEffectStyles();
+                var shadowPresets = [];
+                for (var sp = 0; sp < effectShadows.length; sp++) {
+                    shadowPresets.push({
+                        slug: effectShadows[sp].name,
+                        shadow: effectShadows[sp].value,
+                        name: humanizeSlug(effectShadows[sp].name)
+                    });
+                }
+                if (shadowPresets.length > 0) {
+                    themeJson.settings.shadow = { presets: shadowPresets };
                 }
             }
 

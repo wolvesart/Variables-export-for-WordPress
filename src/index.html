@@ -93,7 +93,7 @@
                 <button class="primary" id="generate"><span class="icon"></span>Download</button>
             </div>
             <div class="success" id="success">
-                ✅ File generated successfully! Place it in <code>assets/scss/</code>
+                File generated successfully! Place it in <code>assets/scss/</code>
             </div>
         </footer>
     </div>
@@ -110,56 +110,106 @@
         <section class="mapping-container" id="mapping-container">
             <div class="mapping-section-title">Colors</div>
             <div class="mapping-row">
-                <div class="mapping-label" id="label-map-colors">
+                <label class="mapping-label" for="map-colors">
                     Color palette
-                </div>
+                    <small>settings.color.palette</small>
+                </label>
                 <span class="mapping-arrow"></span>
-                <select class="mapping-select" id="map-colors" aria-labelledby="label-map-colors">
+                <select class="mapping-select" id="map-colors">
                     <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Typography</div>
             <div class="mapping-row">
-                <div class="mapping-label" id="label-map-fontFamilies">
+                <label class="mapping-label" for="map-fontFamilies">
                     Font family
-                </div>
+                    <small>settings.typography.fontFamilies</small>
+                </label>
                 <span class="mapping-arrow"></span>
-                <select class="mapping-select" id="map-fontFamilies" aria-labelledby="label-map-fontFamilies">
+                <select class="mapping-select" id="map-fontFamilies">
                     <option value="">-- Select --</option>
                 </select>
             </div>
             <div class="mapping-row">
-                <div class="mapping-label" id="label-map-fontSizes">
+                <label class="mapping-label" for="map-fontSizes">
                     Font size
-                </div>
+                    <small>settings.typography.fontSizes</small>
+                </label>
                 <span class="mapping-arrow"></span>
-                <select class="mapping-select" id="map-fontSizes" aria-labelledby="label-map-fontSizes">
+                <select class="mapping-select" id="map-fontSizes">
                     <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Spacing</div>
             <div class="mapping-row">
-                <div class="mapping-label" id="label-map-spacing">
+                <label class="mapping-label" for="map-spacing">
                     Spacing sizes
-                </div>
+                    <small>settings.spacing.spacingSizes</small>
+                </label>
                 <span class="mapping-arrow"></span>
-                <select class="mapping-select" id="map-spacing" aria-labelledby="label-map-spacing">
+                <select class="mapping-select" id="map-spacing">
                     <option value="">-- Select --</option>
                 </select>
             </div>
 
             <div class="mapping-section-title">Layout</div>
             <div class="mapping-row">
-                <div class="mapping-label" id="label-map-radius">
-                    Custom radius
-                </div>
+                <label class="mapping-label" for="map-contentSize">
+                    Content size
+                    <small>One variable &rarr; settings.layout.contentSize</small>
+                </label>
                 <span class="mapping-arrow"></span>
-                <select class="mapping-select" id="map-radius" aria-labelledby="label-map-radius">
+                <select class="mapping-select" id="map-contentSize" data-variable-select>
                     <option value="">-- Select --</option>
                 </select>
             </div>
+            <div class="mapping-row">
+                <label class="mapping-label" for="map-wideSize">
+                    Wide size
+                    <small>One variable &rarr; settings.layout.wideSize</small>
+                </label>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-wideSize" data-variable-select>
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Borders</div>
+            <div class="mapping-row">
+                <label class="mapping-label" for="map-radius">
+                    Custom radius
+                    <small>settings.custom.radius</small>
+                </label>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-radius">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+            <div class="mapping-row">
+                <label class="mapping-label" for="map-borderWidth">
+                    Border width
+                    <small>settings.custom.borderWidth</small>
+                </label>
+                <span class="mapping-arrow"></span>
+                <select class="mapping-select" id="map-borderWidth">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+
+            <div class="mapping-section-title">Effects</div>
+            <label class="mapping-row" for="map-shadows">
+                <span class="mapping-label">
+                    Shadow presets
+                    <small>From effect styles &rarr; settings.shadow.presets</small>
+                </span>
+                <span class="custom-checkbox">
+                    <input type="checkbox" id="map-shadows" checked>
+                    <span class="checkbox-box"></span>
+                </span>
+            </label>
+
         </section>
 
         <section>
@@ -178,9 +228,7 @@
                 <button class="secondary" id="cancelTheme">Cancel</button>
                 <button class="primary" id="generateTheme"><span class="icon"></span>Generate theme.json</button>
             </div>
-            <div class="success" id="success-theme">
-                ✅ theme.json generated successfully!
-            </div>
+            <div class="success" id="success-theme">theme.json generated successfully!</div>
         </footer>
     </div>
 
@@ -196,7 +244,7 @@
             <div class="info-name">Variables export<br>for WordPress</div>
             <div class="info-version">Version 1.0.0</div>
             <footer>
-                <a href="https://github.com/your-repo/issues" target="_blank" class="info-link">Report a bug</a>
+                <a href="https://github.com/wolvesart/Variables-export-for-WordPress/issues" target="_blank" class="info-link">Report a bug</a>
                 <a href="https://wolvesart.fr" target="_blank" class="info-link">Created by Wolvesart</a>
             </footer>
         </div>
