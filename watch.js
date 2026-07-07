@@ -4,7 +4,7 @@ const path = require('path');
 
 const srcDir = path.join(__dirname, 'src');
 
-console.log('👀 Watching for changes in src/...');
+console.log('Watching for changes in src/...');
 console.log('   Press Ctrl+C to stop\n');
 
 // Run initial build
@@ -19,26 +19,26 @@ const watcher = chokidar.watch(srcDir, {
 
 watcher
     .on('change', (filePath) => {
-        console.log(`\n📝 Changed: ${path.relative(__dirname, filePath)}`);
+        console.log(`\nChanged: ${path.relative(__dirname, filePath)}`);
         runBuild();
     })
     .on('add', (filePath) => {
-        console.log(`\n➕ Added: ${path.relative(__dirname, filePath)}`);
+        console.log(`\nAdded: ${path.relative(__dirname, filePath)}`);
         runBuild();
     })
     .on('unlink', (filePath) => {
-        console.log(`\n➖ Removed: ${path.relative(__dirname, filePath)}`);
+        console.log(`\nRemoved: ${path.relative(__dirname, filePath)}`);
         runBuild();
     });
 
 function runBuild() {
     exec('node build.js', (error, stdout, stderr) => {
         if (error) {
-            console.error(`❌ Build error: ${error.message}`);
+            console.error(`Build error: ${error.message}`);
             return;
         }
         if (stderr) {
-            console.error(`⚠️  ${stderr}`);
+            console.error(stderr);
         }
         console.log(stdout);
     });

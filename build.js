@@ -44,7 +44,7 @@ function buildJS() {
 function buildFontFace() {
     const fontFile = path.join(srcDir, 'fonts', 'CascadiaCode.woff2');
     if (!fs.existsSync(fontFile)) {
-        console.warn('⚠️  Font not found (src/fonts/CascadiaCode.woff2) — skipping @font-face embedding');
+        console.warn('Font not found (src/fonts/CascadiaCode.woff2) — skipping @font-face embedding');
         return '';
     }
     const base64 = fs.readFileSync(fontFile).toString('base64');
@@ -90,7 +90,7 @@ function build() {
     // Write output
     fs.writeFileSync(outputFile, html, 'utf8');
 
-    console.log(`✅ ui.html built successfully!`);
+    console.log(`ui.html built successfully!`);
     console.log(`   - SCSS: app.scss compiled`);
     console.log(`   - JS: ui.js included`);
     console.log(`   - Output: ${outputFile}`);

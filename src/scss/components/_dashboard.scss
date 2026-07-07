@@ -49,6 +49,11 @@
     flex-direction: column;
     gap: 12px;
 
+    #chart-hint {
+      font: var(--font-body-small);
+      color: var(--color-text-secondary);
+    }
+
     .details {
       display: flex;
       flex-direction: column;

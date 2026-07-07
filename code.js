@@ -8,8 +8,24 @@ figma.showUI(__html__, { width: 460, height: 650 });
 // outside variable collections). When it isn't selected, styles are not exported.
 var STYLES_COLLECTION_ID = 'styles';
 
+// Compute used/unused counts against local variables and send them to the UI.
+function postUsageStats(usedIds, localVariables, provisional) {
+    var usedCount = 0;
+    for (var i = 0; i < localVariables.length; i++) {
+        if (usedIds.has(localVariables[i].id)) usedCount++;
+    }
+    figma.ui.postMessage({
+        type: 'usage-stats',
+        provisional: provisional,
+        stats: {
+            exported: usedCount,
+            skipped: localVariables.length - usedCount
+        }
+    });
+}
+
 // Send initial stats when plugin loads
-async function sendInitialStats() {
+async function sendInitialStats(persistedUsedIds) {
     try {
         var localVariables = await figma.variables.getLocalVariablesAsync();
         var collections = await figma.variables.getLocalVariableCollectionsAsync();
@@ -139,27 +155,28 @@ async function sendInitialStats() {
             variableOptions: variableOptions
         });
 
-        // 2) Compute variable usage in the background, then send a follow-up
-        //    update that fills in the used/unused counts and the donut chart.
-        var usedVariableIds = await analyzeVariableUsage();
-        var usedCount = 0;
-        for (var uc = 0; uc < localVariables.length; uc++) {
-            if (usedVariableIds.has(localVariables[uc].id)) usedCount++;
+        // 2) Usage stats. Surface the counts persisted by a previous session as
+        //    provisional (instant donut) while the fresh scan runs in the
+        //    background — it posts the final 'usage-stats' itself on completion.
+        if (persistedUsedIds) {
+            postUsageStats(persistedUsedIds, localVariables, true);
         }
-
-        figma.ui.postMessage({
-            type: 'usage-stats',
-            stats: {
-                exported: usedCount,
-                skipped: localVariables.length - usedCount
-            }
-        });
+        await analyzeVariableUsage();
     } catch (error) {
         console.error('Error loading initial stats:', error);
     }
 }
 
-sendInitialStats();
+async function startPlugin() {
+    // Usage analysis is deferred: it's secondary information and must never
+    // delay the plugin window. Counts persisted by a previous session show up
+    // instantly as provisional stats; the fresh scan runs in the background,
+    // time-sliced so Figma stays responsive.
+    var persistedUsedIds = await readPersistedUsage();
+    sendInitialStats(persistedUsedIds);
+}
+
+startPlugin();
 
 // Convert RGBA to HEX
 function rgbaToHex(color) {
@@ -299,12 +316,65 @@ async function extractEffectStyles() {
 }
 
 // Session cache for the variable-usage analysis.
-// Traversing every node on every page (after loadAllPagesAsync) is expensive on
-// large files — the Figma docs warn it causes a significant delay. We therefore
-// compute it once and reuse the result, invalidating only when the document
-// actually changes (see the documentchange listener below).
+// Traversing every node on every page is expensive on large files, so we
+// compute it once per session and reuse the result, invalidating only when the
+// document actually changes (see the documentchange listener below).
 var usedVariableIdsCache = null;
+var usageAnalysisPromise = null;
 var documentChangeListenerRegistered = false;
+
+// Persistent cache (clientStorage) so reopening the plugin can show the last
+// known usage stats instantly while the fresh scan runs in the background.
+var USAGE_CACHE_VERSION = 1;
+
+function getUsageCacheKey() {
+    // figma.fileKey is only exposed to private plugins; fall back to an id
+    // stored in the document's pluginData so the cache stays per-file.
+    var fileId = figma.fileKey;
+    if (!fileId) {
+        fileId = figma.root.getPluginData('vewp-file-id');
+        if (!fileId) {
+            fileId = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+            figma.root.setPluginData('vewp-file-id', fileId);
+        }
+    }
+    return 'usage-cache-v' + USAGE_CACHE_VERSION + ':' + fileId;
+}
+
+async function readPersistedUsage() {
+    try {
+        var entry = await figma.clientStorage.getAsync(getUsageCacheKey());
+        if (entry && Array.isArray(entry.ids)) return new Set(entry.ids);
+    } catch (e) {
+        console.warn('Could not read persisted usage cache:', e);
+    }
+    return null;
+}
+
+async function persistUsage(usedVariableIds, localVariables) {
+    try {
+        // Only persist ids of local variables: that's all the provisional stats
+        // need, and it keeps the entry small on files using many library variables.
+        var ids = [];
+        for (var i = 0; i < localVariables.length; i++) {
+            if (usedVariableIds.has(localVariables[i].id)) ids.push(localVariables[i].id);
+        }
+        await figma.clientStorage.setAsync(getUsageCacheKey(), { ids: ids, savedAt: Date.now() });
+    } catch (e) {
+        console.warn('Could not persist usage cache:', e);
+    }
+}
+
+// Let queued UI messages and Figma's own rendering run between scan slices.
+function yieldToEventLoop() {
+    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+}
+
+// The plugin sandbox shares Figma's main thread: scan slices are budgeted in
+// wall-clock time (not node count) so each one stays within roughly a frame,
+// whatever the per-node cost of crossing the sandbox bridge.
+var YIELD_INTERVAL_MS = 10;
+var YIELD_CHECK_EVERY_NODES = 200;
 
 // Analyze variable usage in the document
 async function analyzeVariableUsage() {
@@ -314,22 +384,29 @@ async function analyzeVariableUsage() {
         return usedVariableIdsCache;
     }
 
+    // Share one in-flight scan between callers (initial stats, preview, export).
+    if (!usageAnalysisPromise) {
+        usageAnalysisPromise = scanDocumentForUsedVariables();
+    }
+    try {
+        return await usageAnalysisPromise;
+    } finally {
+        usageAnalysisPromise = null;
+    }
+}
+
+async function scanDocumentForUsedVariables() {
     console.log('Analyzing variable usage...');
 
     var usedVariableIds = new Set();
+    var visited = 0;
 
-    // Recursive function to traverse all nodes
-    function traverseNode(node) {
-        // Check variable bindings on the node
+    function collectBindings(node) {
         if ('boundVariables' in node && node.boundVariables) {
             var boundVars = node.boundVariables;
-
-            // Iterate through all bound properties
             var properties = Object.keys(boundVars);
             for (var i = 0; i < properties.length; i++) {
-                var property = properties[i];
-                var binding = boundVars[property];
-
+                var binding = boundVars[properties[i]];
                 if (binding) {
                     if (Array.isArray(binding)) {
                         // For properties with multiple bindings (e.g., fills)
@@ -346,43 +423,86 @@ async function analyzeVariableUsage() {
                 }
             }
         }
+    }
 
-        // Traverse children if the node has any
-        if ('children' in node) {
-            var children = node.children;
-            for (var k = 0; k < children.length; k++) {
-                traverseNode(children[k]);
+    // Iterative traversal (explicit stack) so we can yield to the event loop
+    // on a time budget instead of blocking Figma for the whole scan.
+    var lastYield = Date.now();
+    async function traversePage(page) {
+        var stack = [page];
+        while (stack.length > 0) {
+            var node = stack.pop();
+
+            collectBindings(node);
+
+            if ('children' in node) {
+                var children = node.children;
+                for (var k = 0; k < children.length; k++) {
+                    stack.push(children[k]);
+                }
+            }
+
+            visited++;
+            if (visited % YIELD_CHECK_EVERY_NODES === 0 &&
+                Date.now() - lastYield >= YIELD_INTERVAL_MS) {
+                await yieldToEventLoop();
+                lastYield = Date.now();
             }
         }
     }
 
-    // IMPORTANT: Load all pages first
-    // Note: loadAllPagesAsync may not be available in all versions
-    if (figma.loadAllPagesAsync) {
-        await figma.loadAllPagesAsync();
-    }
-
-    // Register the cache-invalidation listener once — in incremental (dynamic-page)
-    // mode, documentchange can only be registered after loadAllPagesAsync.
-    if (!documentChangeListenerRegistered) {
-        documentChangeListenerRegistered = true;
-        figma.on('documentchange', function() {
-            usedVariableIdsCache = null;
-            _localVarByIdCache = null;
-        });
-    }
-
-    // Traverse all pages
+    // Load and scan pages one at a time instead of loadAllPagesAsync: same
+    // total work, but Figma stays responsive and the UI can display progress.
     var pages = figma.root.children;
     for (var p = 0; p < pages.length; p++) {
         var page = pages[p];
         console.log('Analyzing page: ' + page.name);
-        traverseNode(page);
+        figma.ui.postMessage({
+            type: 'usage-progress',
+            current: p + 1,
+            total: pages.length,
+            pageName: page.name
+        });
+        if (page.loadAsync) {
+            await page.loadAsync();
+        }
+        await traversePage(page);
+        await yieldToEventLoop();
+    }
+
+    // Register the cache-invalidation listener once — in incremental
+    // (dynamic-page) mode, documentchange can only be registered after
+    // loadAllPagesAsync, which is nearly free here since the scan above
+    // already loaded every page.
+    if (!documentChangeListenerRegistered) {
+        try {
+            if (figma.loadAllPagesAsync) {
+                await figma.loadAllPagesAsync();
+            }
+            figma.on('documentchange', function() {
+                usedVariableIdsCache = null;
+                _localVarByIdCache = null;
+            });
+            documentChangeListenerRegistered = true;
+        } catch (e) {
+            console.warn('Could not register documentchange listener:', e);
+        }
     }
 
     console.log('Used variables found: ' + usedVariableIds.size);
 
     usedVariableIdsCache = usedVariableIds;
+
+    var localVariables = await figma.variables.getLocalVariablesAsync();
+
+    // Persist for the next plugin launch (instant provisional stats).
+    await persistUsage(usedVariableIds, localVariables);
+
+    // Every completed scan refreshes the dashboard counts — this also clears
+    // the progress hint when a rescan is triggered by preview/export after a
+    // document change.
+    postUsageStats(usedVariableIds, localVariables, false);
+
     return usedVariableIds;
 }
 
@@ -1324,7 +1444,7 @@ figma.ui.onmessage = async function(msg) {
     if (msg.type === 'generate') {
         try {
             console.log('Starting generation');
-            figma.notify('🔄 Extracting variables...', { timeout: 2000 });
+            figma.notify('Extracting variables...', { timeout: 2000 });
 
             var data = await extractVariables(msg.options.onlyUsed, msg.options.selectedCollections);
 
@@ -1347,7 +1467,7 @@ figma.ui.onmessage = async function(msg) {
             }
 
             if (files.length === 0) {
-                figma.notify('⚠️ Select at least one output format', { error: true });
+                figma.notify('Select at least one output format', { error: true });
                 return;
             }
 
@@ -1367,7 +1487,7 @@ figma.ui.onmessage = async function(msg) {
                 }
             });
 
-            var notificationMsg = '✅ Files generated!';
+            var notificationMsg = 'Files generated!';
             if (data.skippedVariables > 0) {
                 notificationMsg += ' (' + data.skippedVariables + ' variables skipped)';
             }
@@ -1386,7 +1506,7 @@ figma.ui.onmessage = async function(msg) {
 
         } catch (error) {
             console.error('Error:', error);
-            figma.notify('❌ Error: ' + error.message, { error: true });
+            figma.notify('Error: ' + error.message, { error: true });
         }
     }
 
@@ -1419,14 +1539,14 @@ figma.ui.onmessage = async function(msg) {
             });
         } catch (error) {
             console.error('Error building preview:', error);
-            figma.notify('❌ Error: ' + error.message, { error: true });
+            figma.notify('Error: ' + error.message, { error: true });
         }
     }
 
     if (msg.type === 'generate-theme') {
         try {
             console.log('Starting theme.json generation with mappings');
-            figma.notify('🔄 Generating theme.json...', { timeout: 2000 });
+            figma.notify('Generating theme.json...', { timeout: 2000 });
 
             var mappings = msg.mappings;
             var onlyUsed = msg.onlyUsed;
@@ -1623,11 +1743,11 @@ figma.ui.onmessage = async function(msg) {
                 content: themeJsonContent
             });
 
-            figma.notify('✅ theme.json generated!', { timeout: 4000 });
+            figma.notify('theme.json generated!', { timeout: 4000 });
 
         } catch (error) {
             console.error('Error:', error);
-            figma.notify('❌ Error: ' + error.message, { error: true });
+            figma.notify('Error: ' + error.message, { error: true });
         }
     }
 };

@@ -173,7 +173,6 @@ function drawPieChart(used, unused) {
         progressCircle.setAttribute('stroke-width', strokeWidth);
         progressCircle.setAttribute('stroke-linecap', 'butt');
         progressCircle.setAttribute('stroke-dasharray', `${usedLength} ${circumference}`);
-        progressCircle.setAttribute('stroke-dashoffset', circumference / 4);
         progressCircle.setAttribute('transform', `rotate(-90 ${centerX} ${centerY})`);
         svg.appendChild(progressCircle);
     }
@@ -284,7 +283,7 @@ function copyFileContent(text, btn, filename) {
         setTimeout(() => btn.classList.remove('copied'), 1200);
         // Native Figma toast, triggered via code.js
         parent.postMessage({
-            pluginMessage: { type: 'notify', message: '📋 ' + filename + ' copied to clipboard' }
+            pluginMessage: { type: 'notify', message: filename + ' copied to clipboard' }
         }, '*');
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -497,12 +496,12 @@ window.onmessage = async (event) => {
 
     if (msg.type === 'initial-stats') {
         // Lightweight stats: render the dashboard immediately. Used/unused counts
-        // arrive later via the 'usage-stats' message, so show a placeholder for now.
+        // arrive later via the 'usage-stats' message, so keep that block hidden
+        // until then.
         document.getElementById('stat-total').textContent = msg.stats.total;
-        document.getElementById('stat-exported').textContent = '…';
-        document.getElementById('stat-skipped').textContent = '…';
         document.getElementById('chart-percent').textContent = '…';
         document.getElementById('dashboard').classList.add('show');
+        document.getElementById('usage-details').style.display = 'none';
         document.getElementById('chart-hint').style.display = 'none';
 
         // Render collections grid
@@ -529,11 +528,26 @@ window.onmessage = async (event) => {
         renderFileLists(msg.files);
     }
 
+    if (msg.type === 'usage-progress') {
+        // Page-by-page scan progress: keep the user informed while the document
+        // is being analyzed (can take a while on large files).
+        const hint = document.getElementById('chart-hint');
+        hint.textContent = `Analyzing usage… page ${msg.current}/${msg.total}`;
+        hint.style.display = 'block';
+    }
+
     if (msg.type === 'usage-stats') {
-        // Follow-up to 'initial-stats': fill in used/unused counts and draw the chart.
+        // Follow-up to 'initial-stats': fill in used/unused counts, reveal the
+        // block and draw the chart. Provisional stats come from the persisted
+        // cache of the previous session; the scan hint stays visible until the
+        // fresh scan confirms them.
         document.getElementById('stat-exported').textContent = msg.stats.exported;
         document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+        document.getElementById('usage-details').style.display = '';
         drawPieChart(msg.stats.exported, msg.stats.skipped);
+        if (!msg.provisional) {
+            document.getElementById('chart-hint').style.display = 'none';
+        }
     }
 
     if (msg.type === 'download-multiple') {
@@ -560,6 +574,7 @@ window.onmessage = async (event) => {
             document.getElementById('stat-total').textContent = msg.stats.total;
             document.getElementById('stat-exported').textContent = msg.stats.exported;
             document.getElementById('stat-skipped').textContent = msg.stats.skipped;
+            document.getElementById('usage-details').style.display = '';
             document.getElementById('dashboard').classList.add('show');
 
             // Hide hint and draw pie chart
